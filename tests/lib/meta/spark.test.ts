@@ -52,6 +52,18 @@ describe("sparkJSON", () => {
     expect(f).toHaveBeenCalledTimes(3);
   });
 
+  it("retries network errors and timeouts, passing an abort signal", async () => {
+    const f = vi.fn().mockRejectedValueOnce(new TypeError("fetch failed")).mockRejectedValueOnce(new DOMException("timed out", "TimeoutError")).mockResolvedValueOnce(reply('{"ok":true}'));
+    expect(await sparkJSON("s", "u", isOk, { fetchImpl: f as unknown as typeof fetch, sleep, timeoutMs: 5 })).toEqual({ ok: true });
+    expect(f.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("gives up after repeated 5xx", async () => {
+    const f = seq(new Response("", { status: 500 }), new Response("", { status: 502 }), new Response("", { status: 503 }));
+    await expect(sparkJSON("s", "u", isOk, { fetchImpl: f as unknown as typeof fetch, sleep })).rejects.toThrow(/503/);
+    expect(f).toHaveBeenCalledTimes(3);
+  });
+
   it("does not retry other 4xx", async () => {
     const f = seq(new Response("", { status: 401 }));
     await expect(sparkJSON("s", "u", isOk, { fetchImpl: f, sleep })).rejects.toThrow(/401/);

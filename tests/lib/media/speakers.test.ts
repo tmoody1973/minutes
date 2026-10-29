@@ -48,6 +48,13 @@ describe("matchRoster", () => {
     expect(matchRoster("Zed Pratt", roster)).toBeNull();
     expect(matchRoster("Andrea Pratt", roster)?.personId).toBe(3);
   });
+  it("compares a heard initial to the roster initial", () => {
+    expect(matchRoster("B. Pratt", [{ personId: 3, name: "ALD. A. PRATT" }])).toBeNull();
+    expect(matchRoster("A. Pratt", [{ personId: 3, name: "ALD. A. PRATT" }])?.personId).toBe(3);
+  });
+  it("ignores name suffixes when choosing the surname", () => {
+    expect(matchRoster("Pratt", [{ personId: 5, name: "Andrew Pratt Jr." }])?.personId).toBe(5);
+  });
   it("returns null when two roster entries match", () => {
     const amb = [...roster, { personId: 9, name: "ALD. B. PRATT" }];
     expect(matchRoster("Pratt", amb)).toBeNull();
@@ -97,6 +104,14 @@ describe("assignFromCues", () => {
     expect(same).toHaveLength(1);
     expect(same[0].evidenceTurnKey).toBe(a.turnKey);
   });
+  it("Ruling 16: self cue takes a roster identity only if first name/initial agree", () => {
+    const a = t("c0:A");
+    const run = (name: string, r: RosterEntry[]) => assignFromCues([a], [cue("self", name, a, a)], r);
+    expect(run("Sam Burgess", roster)[0]).toMatchObject({ source: "legistar", personId: 2 });
+    expect(run("Tom Burgess", roster)[0]).toMatchObject({ source: "self-intro", name: "Tom Burgess" });
+    expect(run("Sam Burgess", [{ personId: 8, name: "Scott Burgelis" }])[0]).toMatchObject({ source: "self-intro", name: "Sam Burgess" });
+    expect(run("Scot Burgelis", [{ personId: 8, name: "Scott Burgelis" }])[0]).toMatchObject({ source: "legistar", personId: 8 });
+  });
   it("skips cues whose target is missing or unlabeled", () => {
     const a = t("c0:A");
     const nul = t(null);
@@ -119,6 +134,21 @@ describe("validateAssignment", () => {
     expect(validateAssignment({ ...good, name: "Ald. R. Bauman" }, [a, b], cues, roster)).toBe(false);
     expect(validateAssignment({ ...good, label: "c0:A" }, [a, b], cues, roster)).toBe(false);
     expect(validateAssignment({ label: "c0:Z", name: "Anyone", source: "manual", evidenceTurnKey: "" }, [a, b], cues, roster)).toBe(true);
+  });
+});
+
+describe("validateAssignment (self-contained)", () => {
+  it("conflicting cues on a label make both invalid; wrong evidence key is invalid", () => {
+    const a = t("c0:A");
+    const b = t("c0:B");
+    const c = t("c0:C");
+    const cues = [cue("recognized", "Pratt", a, c), cue("recognized", "Bauman", b, c)];
+    const mk = (name: string, personId: number, ev: Turn): SpeakerAssignment => ({ label: "c0:C", name, personId, source: "legistar", evidenceTurnKey: ev.turnKey });
+    expect(validateAssignment(mk("Ald. A. Pratt", 3, a), [a, b, c], cues, roster)).toBe(false);
+    expect(validateAssignment(mk("Ald. R. Bauman", 1, b), [a, b, c], cues, roster)).toBe(false);
+    const ok = [cue("recognized", "Pratt", a, c)];
+    expect(validateAssignment(mk("Ald. A. Pratt", 3, a), [a, b, c], ok, roster)).toBe(true);
+    expect(validateAssignment(mk("Ald. A. Pratt", 3, b), [a, b, c], ok, roster)).toBe(false);
   });
 });
 
@@ -153,6 +183,15 @@ describe("nameSpeakers", () => {
     const acc = (label: string): SpeakerAssignment => ({ label, name: "Ald. A. Pratt", personId: 3, source: "legistar", evidenceTurnKey: "x" });
     expect(nameSpeakers([a, b], [acc("c0:A"), acc("c1:C")]).map((o) => o.display)).toEqual(["Ald. A. Pratt", "Ald. A. Pratt"]);
   });
+  it("conflicting automatic names leave the label unnamed; latest manual wins", () => {
+    const a = t("c0:A");
+    const b = t("c0:B");
+    const auto = (name: string): SpeakerAssignment => ({ label: "c0:A", name, source: "self-intro", evidenceTurnKey: "x" });
+    expect(nameSpeakers([a], [auto("Brian Emmerich"), auto("Curtis Oquist")])[0].display).toBe("Speaker A");
+    const man = (name: string, at: number): SpeakerAssignment => ({ label: "c0:B", name, source: "manual", evidenceTurnKey: "", at, by: "tarik" });
+    expect(nameSpeakers([b], [man("New", 20), man("Old", 10)])[0].display).toBe("New");
+    expect(nameSpeakers([b], [man("Old", 10), man("New", 20)])[0].display).toBe("New");
+  });
   it("manual overrides automatic for its label", () => {
     const a = t("c0:A");
     const accepted: SpeakerAssignment[] = [
@@ -167,39 +206,52 @@ describe("confirmAssignments", () => {
   const setup = () => {
     const turns = [t("c0:A", "Alderman Pratt."), t("c0:B", "Thank you chair."), t("c0:A", "Go on")];
     const cand: SpeakerAssignment = { label: "c0:B", name: "Ald. A. Pratt", personId: 3, source: "legistar", evidenceTurnKey: turns[0].turnKey };
-    return { turns, cand };
+    const cues = [cue("recognized", "Pratt", turns[0], turns[1])];
+    return { turns, cand, cues };
   };
   it("confirm keeps the candidate unchanged even if the model returns a different name", async () => {
-    const { turns, cand } = setup();
+    const { turns, cand, cues } = setup();
     const spark = vi.fn(async () => ({ confirm: true, reason: "hand-off", name: "Someone Else" })) as never;
-    const r = await confirmAssignments([cand], turns, spark);
+    const r = await confirmAssignments([cand], turns, cues, spark);
     expect(r.accepted).toEqual([cand]);
     expect(r.rejected).toEqual([]);
   });
   it("sends context with labels and text, and the candidate name", async () => {
-    const { turns, cand } = setup();
+    const { turns, cand, cues } = setup();
     const spark = vi.fn(async () => ({ confirm: true, reason: "ok" }));
-    await confirmAssignments([cand], turns, spark as never);
+    await confirmAssignments([cand], turns, cues, spark as never);
     const [system, user] = spark.mock.calls[0] as unknown as string[];
     expect(system).toMatch(/doubt/i);
     expect(user).toContain("Ald. A. Pratt");
     expect(user).toContain("c0:B");
     expect(user).toContain("Thank you chair.");
+    expect(user).toContain('Spoken name in the cue: "Pratt"');
+    expect(user).toMatch(/CUE\s+\[c0:A\]/);
+    expect(user).toMatch(/TARGET\s+\[c0:B\]/);
+    expect(user).toContain("<transcript>");
+    expect(system).toMatch(/untrusted/i);
+  });
+  it("missing context rejects without calling the model", async () => {
+    const { turns, cand } = setup();
+    const spark = vi.fn();
+    const r = await confirmAssignments([cand], turns, [], spark as never);
+    expect(spark).not.toHaveBeenCalled();
+    expect(r.rejected).toEqual([{ a: cand, reason: "context not found" }]);
   });
   it("reject drops with the reason", async () => {
-    const { turns, cand } = setup();
+    const { turns, cand, cues } = setup();
     const spark = vi.fn(async () => ({ confirm: false, reason: "only mentioned" }));
-    const r = await confirmAssignments([cand], turns, spark as never);
+    const r = await confirmAssignments([cand], turns, cues, spark as never);
     expect(r.accepted).toEqual([]);
     expect(r.rejected).toEqual([{ a: cand, reason: "only mentioned" }]);
   });
   it("spark failure -> rejected as model unavailable", async () => {
-    const { turns, cand } = setup();
+    const { turns, cand, cues } = setup();
     const spark = vi.fn(async () => {
       throw new Error("boom");
     });
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const r = await confirmAssignments([cand], turns, spark as never);
+    const r = await confirmAssignments([cand], turns, cues, spark as never);
     expect(r.rejected).toEqual([{ a: cand, reason: "model unavailable" }]);
   });
 });

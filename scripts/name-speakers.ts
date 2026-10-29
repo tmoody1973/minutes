@@ -20,7 +20,7 @@ const roster = JSON.parse(
 ) as RosterEntry[];
 const candidates = assignFromCues(turns, cues, roster);
 async function main() {
-const { accepted, rejected } = await confirmAssignments(candidates, turns);
+const { accepted, rejected } = await confirmAssignments(candidates, turns, cues);
 const guarded = accepted.filter((a) => validateAssignment(a, turns, cues, roster));
 const named = nameSpeakers(turns, guarded);
 const namedTurns = named.filter((n) => !/^(Speaker |Unidentified)/.test(n.display)).length;

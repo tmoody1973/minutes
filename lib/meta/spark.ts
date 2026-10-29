@@ -1,7 +1,14 @@
 const URL = "https://api.meta.ai/v1/chat/completions";
 const RETRIES = 2;
 
-type Opts = { fetchImpl?: (url: string, init: RequestInit) => Promise<Response>; sleep?: (ms: number) => Promise<void> };
+type Opts = {
+  fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
+  sleep?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+};
+
+// Non-retryable failure (auth, bad request): thrown straight through the retry loop.
+class SparkFatalError extends Error {}
 
 // First balanced {...} in the text, respecting string literals; null if none parses.
 function firstJSONObject(text: string): unknown {
@@ -32,6 +39,7 @@ function firstJSONObject(text: string): unknown {
 export async function sparkJSON<T>(system: string, user: string, validate: (x: unknown) => x is T, opts: Opts = {}): Promise<T> {
   const key = process.env.META_API_KEY;
   if (!key) throw new Error("META_API_KEY is not set; Muse Spark calls need it in the environment (.env.local)");
+  const timeoutMs = opts.timeoutMs ?? 60_000;
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   let lastErr = "no attempts";
@@ -40,6 +48,7 @@ export async function sparkJSON<T>(system: string, user: string, validate: (x: u
     try {
       const res = await doFetch(URL, {
         method: "POST",
+        signal: AbortSignal.timeout(timeoutMs),
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify({
           model: "muse-spark-1.3",
@@ -55,14 +64,14 @@ export async function sparkJSON<T>(system: string, user: string, validate: (x: u
         lastErr = `HTTP ${res.status}`;
         continue;
       }
-      if (!res.ok) throw new Error(`Muse Spark request failed: HTTP ${res.status}`);
+      if (!res.ok) throw new SparkFatalError(`Muse Spark request failed: HTTP ${res.status}`);
       const body = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
       const content = body.choices?.[0]?.message?.content;
       const parsed = typeof content === "string" ? firstJSONObject(content) : null;
       if (validate(parsed)) return parsed;
       lastErr = content == null ? "empty content" : "invalid JSON shape";
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith("Muse Spark request failed")) throw e;
+      if (e instanceof SparkFatalError) throw e;
       lastErr = e instanceof Error ? e.message : String(e);
     }
   }
