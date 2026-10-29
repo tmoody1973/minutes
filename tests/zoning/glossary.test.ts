@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEMO_CODES, NOT_FOUND, displayable, entriesForTest, lookup, type GlossaryEntry } from "@/lib/zoning/glossary";
+import { displayable, lookup, lookupIn } from "@/lib/zoning/glossary";
+import { DEMO_CODES, GLOSSARY_DATA, NOT_FOUND, type GlossaryEntry } from "@/lib/zoning/glossary-data";
 
 const FIX = join(__dirname, "../fixtures");
 // Collapse whitespace. Only a hyphen at a line END is rejoined (a compound hyphen wrapped, "RS1-\nRS5");
@@ -23,8 +24,8 @@ const blockFor = (e: GlossaryEntry) => {
   const end = rest.findIndex((l) => l.startsWith("# "));
   return norm((end < 0 ? rest : rest.slice(0, end)).join("\n"));
 };
-const entries = entriesForTest().map(([k, e]) => [k, e] as const);
-const GLOSSARY = Object.fromEntries(entries);
+const GLOSSARY = GLOSSARY_DATA;
+const entries = Object.entries(GLOSSARY).map(([k, e]) => [k, e] as const);
 
 describe("zoning glossary", () => {
   it("has the required terms", () => {
@@ -76,6 +77,13 @@ describe("zoning glossary", () => {
   });
 });
 
+describe("hyphen normalization", () => {
+  it("does not rejoin a mid-line hyphen but rejoins a line-end one", () => {
+    expect(norm("in the mid- to late-1900s")).toBe("in the mid- to late-1900s");
+    expect(norm("the RS1-\nRS5 districts")).toBe("the RS1-RS5 districts");
+  });
+});
+
 describe("lookup", () => {
   it("never returns an unapproved plain line", () => {
     for (const [k] of entries) {
@@ -84,6 +92,11 @@ describe("lookup", () => {
       expect(r!.plain).toBeNull();
       expect(r!.officialText.length).toBeGreaterThan(0);
     }
+  });
+  it("returns the plain line when an entry is approved (wiring is not vacuous)", () => {
+    const approved = Object.fromEntries(entries.map(([k, e]) => [k, { ...e, approved: true }]));
+    for (const [k, e] of entries) expect(lookupIn(approved, k)!.plain).toBe(e.plain);
+    expect(lookupIn({ ...approved, PD: { ...approved.PD, approved: false } }, "PD")!.plain).toBeNull();
   });
   it("returns null for unknown keys and prototype names", () => {
     expect(lookup("nope")).toBeNull();
