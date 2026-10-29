@@ -5,8 +5,18 @@ import { tallyV } from "./schema";
 type Upserted = { inserted: boolean; changedFields: string[] };
 type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "persons";
 
-// Insert or patch by legistarId. Only keys present in `rec` are compared or written, so
-// fields owned by other mutations (e.g. eventItems.tally) survive a re-sync.
+// Optional fields this upsert owns: if upstream drops one, we clear it. Deliberately excludes
+// fields written by other mutations (eventItems.tally).
+const CLEARABLE: Record<LegistarTable, string[]> = {
+  events: ["clipId", "agendaUrl", "minutesUrl", "insiteUrl"],
+  eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder"],
+  matters: ["introDate"],
+  histories: ["passed", "eventId"],
+  persons: ["bodyId", "role"],
+};
+
+// Insert or patch by legistarId. Compares incoming keys plus this table's clearable keys;
+// keys that went set -> absent are patched to undefined (unsets the field).
 async function upsert(ctx: MutationCtx, table: LegistarTable, rec: Record<string, unknown> & { legistarId: number }) {
   const existing = await ctx.db
     .query(table)
@@ -17,8 +27,12 @@ async function upsert(ctx: MutationCtx, table: LegistarTable, rec: Record<string
     return { id, inserted: true, changedFields: [] as string[] };
   }
   const stored = existing as Record<string, unknown>;
-  const changedFields = Object.keys(rec).filter((k) => JSON.stringify(stored[k]) !== JSON.stringify(rec[k]));
-  if (changedFields.length) await ctx.db.patch(existing._id, rec as never);
+  const keys = [...new Set([...Object.keys(rec), ...CLEARABLE[table]])];
+  const changedFields = keys.filter((k) => JSON.stringify(stored[k]) !== JSON.stringify(rec[k]));
+  if (changedFields.length) {
+    const patch = Object.fromEntries(changedFields.map((k) => [k, rec[k]]));
+    await ctx.db.patch(existing._id, patch as never);
+  }
   return { id: existing._id, inserted: false, changedFields };
 }
 

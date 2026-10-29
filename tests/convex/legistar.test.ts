@@ -23,6 +23,21 @@ describe("idempotent upserts", () => {
     expect(r).toEqual({ inserted: false, changedFields: ["agendaUrl"] });
   });
 
+  it("a field that disappears upstream is cleared and reported; tally is not owned by upsert", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(api.legistar.upsertEvent, event);
+    const { agendaUrl: _a, ...bare } = event;
+    expect(await t.mutation(api.legistar.upsertEvent, bare)).toEqual({ inserted: false, changedFields: ["agendaUrl"] });
+    const row = await t.run((ctx) => ctx.db.query("events").first());
+    expect(row).not.toHaveProperty("agendaUrl");
+    expect(await t.mutation(api.legistar.upsertEvent, bare)).toEqual({ inserted: false, changedFields: [] });
+    await t.mutation(api.legistar.upsertEvent, future);
+    await t.mutation(api.legistar.upsertEventItem, { ...item, mover: "X" });
+    await t.mutation(api.legistar.setEventItemTally, { eventItemLegistarId: 5, tally: { aye: 1, no: 0, excused: 0, other: 0 } });
+    expect((await t.mutation(api.legistar.upsertEventItem, item)).changedFields).toEqual(["mover"]);
+    expect((await t.run((ctx) => ctx.db.query("eventItems").first()))?.tally?.aye).toBe(1);
+  });
+
   it("matter, person, and setEventItemTally update in place", async () => {
     const t = convexTest(schema, modules);
     const m = { legistarId: 77, fileNumber: "250001", title: "T", typeName: "Ordinance", statusName: "In Committee" };
