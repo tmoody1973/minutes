@@ -21,10 +21,11 @@ const NAME_TOKEN = String.raw`(?:\d+(?:st|nd|rd|th)|[A-Z][A-Za-z.'-]*|du|de|del|
 // number[-high] [and number]* DIR name-tokens TYPE. Case-sensitive on purpose: capitalized names only
 // (plus lowercase connectors like "du"). The direction word is REQUIRED: without it we cannot tell
 // "2000 Fond du Lac Avenue" from a mis-parse, so we omit it (precision over recall).
-// "...(that|which) (currently) includes N ..." names an existing context site, not a subject site: skipped.
-// A number right after Phase/Unit/No./Number/Lot is not a house number.
+// A whole match is skipped (all numbers in its "and" list) when it follows "includes" (an existing
+// context site, not a subject site) or Phase/Unit/No./Number/Lot (not a house number).
+const SKIP_BEFORE = /\b(?:phase|unit|no\.?|number|lot|includes)\s+$/i;
 const ADDRESS_RE = new RegExp(
-  String.raw`(?<!\b(?:[Pp]hase|[Uu]nit|No\.?|[Nn]umber|[Ll]ot|includes)\s+)\b(\d{1,5})(?:-(\d{1,5}))?((?:\s+and\s+\d{1,5})*)\s+(North|South|East|West)\s+((?:${NAME_TOKEN}\s+){1,4}?)(${ALL_TYPES})\b`,
+  String.raw`\b(\d{1,5})(?:-(\d{1,5}))?((?:\s+and\s+\d{1,5})*)\s+(North|South|East|West)\s+((?:${NAME_TOKEN}\s+){1,4}?)(${ALL_TYPES})\b`,
   "g",
 );
 
@@ -42,6 +43,7 @@ export function extractAddresses(title: string): Address[] {
   const out: Address[] = [];
   const seen = new Set<string>();
   for (const m of title.matchAll(ADDRESS_RE)) {
+    if (SKIP_BEFORE.test(title.slice(0, m.index))) continue;
     const [, num, high, andList, dirWord, nameRaw, typeWord] = m;
     // MPROP spelling: uppercase, no periods/apostrophes, hyphens kept, single spaces.
     const street = nameRaw.toUpperCase().replace(/[.']/g, "").replace(/\s+/g, " ").trim();

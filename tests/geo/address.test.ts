@@ -71,4 +71,17 @@ describe("extractAddresses", () => {
     expect(extractAddresses("the DPD that includes 100 North Foo Street")).toEqual([]);
     expect(extractAddresses("the DPD which currently includes 100 North Foo Street")).toEqual([]);
   });
+  it("skips the whole address list after 'includes'", () => {
+    expect(extractAddresses("which includes 100 and 102 North Foo Street")).toEqual([]);
+    expect(extractAddresses("that currently includes 3300 and 3302 North Martin Luther King Jr. Drive")).toEqual([]);
+  });
+  it("still extracts a later real address in a new clause", () => {
+    expect(extractAddresses("that includes 100 North Foo Street, and a new building at 200 West Bar Street")).toEqual([
+      { houseNumber: 200, dir: "W", street: "BAR", type: "ST" },
+    ]);
+  });
+  it("guard words are case-insensitive", () => {
+    expect(extractAddresses("PHASE 1 North Plaza Court")).toEqual([]);
+    expect(extractAddresses("LOT 7 North Plaza Court")).toEqual([]);
+  });
 });
