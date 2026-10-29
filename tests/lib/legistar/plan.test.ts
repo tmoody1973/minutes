@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventsFilter, hasVotes, matterIdsOf, memberFilter, syncWindow } from "@/lib/legistar/plan";
+import { MATTER_FRESH_MS, eventsFilter, hasVotes, isMatterFresh, matterIdsOf, memberFilter, syncWindow } from "@/lib/legistar/plan";
 
 describe("syncWindow", () => {
   it("spans days back to days ahead as YYYY-MM-DD", () => {
@@ -32,5 +32,15 @@ describe("hasVotes", () => {
     expect(hasVotes({ actionName: "PASSED" })).toBe(true);
     expect(hasVotes({ passed: false })).toBe(true);
     expect(hasVotes({})).toBe(false);
+  });
+});
+
+describe("isMatterFresh", () => {
+  it("skips only matters synced under the threshold ago", () => {
+    const now = 10_000_000;
+    expect(isMatterFresh(now - MATTER_FRESH_MS + 1, now)).toBe(true);
+    expect(isMatterFresh(now - MATTER_FRESH_MS, now)).toBe(false);
+    expect(isMatterFresh(null, now)).toBe(false);
+    expect(isMatterFresh(undefined, now)).toBe(false);
   });
 });

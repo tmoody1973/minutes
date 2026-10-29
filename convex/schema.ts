@@ -40,6 +40,8 @@ export default defineSchema({
     typeName: v.string(),
     statusName: v.string(),
     introDate: v.optional(v.string()),
+    // ms timestamp of the last complete syncMatter; lets frequent runs skip fresh matters.
+    syncedAt: v.optional(v.number()),
     // Exhibit list (name + hyperlink) from matters/{id}/attachments; Milestone 2 reads exhibit maps from it.
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
   }).index("by_legistarId", ["legistarId"]),
@@ -60,12 +62,11 @@ export default defineSchema({
     personName: v.string(),
     value: v.string(),
   }).index("by_eventItem", ["eventItemId"]),
-  persons: defineTable({
-    legistarId: v.number(),
-    name: v.string(),
-    bodyId: v.optional(v.number()),
-    role: v.optional(v.string()),
-  }).index("by_legistarId", ["legistarId"]),
+  persons: defineTable({ legistarId: v.number(), name: v.string() }).index("by_legistarId", ["legistarId"]),
+  // One row per (person, body): people sit on several bodies, so this is not a field on persons.
+  memberships: defineTable({ personId: v.number(), bodyId: v.number(), role: v.optional(v.string()) })
+    .index("by_body", ["bodyId"])
+    .index("by_person", ["personId"]),
   changes: defineTable({
     kind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("step_added")),
     matterId: v.number(),
@@ -80,5 +81,7 @@ export default defineSchema({
     finishedAt: v.number(),
     ok: v.boolean(),
     error: v.optional(v.string()),
+    // "top" = entry-point run (ok means scheduled); "child" = fan-out job, written only on failure.
+    scope: v.union(v.literal("top"), v.literal("child")),
   }).index("by_finishedAt", ["finishedAt"]),
 });

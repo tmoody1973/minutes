@@ -4,7 +4,7 @@ import { internalAction, type ActionCtx } from "./_generated/server";
 import { legistarGet } from "../lib/legistar/client";
 import { parseEvent, parseEventItem, parseHistory, parseMatter, parseVote } from "../lib/legistar/parse";
 import { computeTally } from "../lib/legistar/tally";
-import { eventsFilter, hasVotes, matterIdsOf, memberFilter } from "../lib/legistar/plan";
+import { eventsFilter, hasVotes, isMatterFresh, matterIdsOf, memberFilter } from "../lib/legistar/plan";
 
 type Raw = Record<string, unknown>;
 
@@ -13,16 +13,39 @@ const BODY_IDS = [1, 11, 272];
 // Fan-out spacing: scheduled jobs start this far apart so Legistar (a public city API) sees a trickle.
 const STAGGER_MS = 1000;
 
-// Record one syncRuns row per run; failures are logged, never delete data.
-async function recorded(ctx: ActionCtx, label: string, work: () => Promise<void>) {
+type Scope = "top" | "child";
+
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+// Collects per-record failures so one bad record never aborts the rest of a job.
+function collector() {
+  const errors: string[] = [];
+  return {
+    errors,
+    async attempt(id: string, fn: () => Promise<void>) {
+      try {
+        await fn();
+      } catch (err) {
+        errors.push(`${id}: ${errText(err)}`);
+      }
+    },
+  };
+}
+
+// Top-scope runs write a row either way (ok means "listed and scheduled"). Child jobs write ONE row,
+// and only when something failed, listing every collected error. Data is never deleted.
+async function recorded(ctx: ActionCtx, scope: Scope, label: string, work: (errors: ReturnType<typeof collector>) => Promise<void>) {
   const startedAt = Date.now();
+  const c = collector();
   try {
-    await work();
-    await ctx.runMutation(api.legistar.recordSyncRun, { startedAt, finishedAt: Date.now(), ok: true });
+    await work(c);
   } catch (err) {
-    const error = `${label}: ${err instanceof Error ? err.message : String(err)}`;
-    console.error(error);
-    await ctx.runMutation(api.legistar.recordSyncRun, { startedAt, finishedAt: Date.now(), ok: false, error });
+    c.errors.push(errText(err));
+  }
+  const error = c.errors.length ? `${label}: ${c.errors.join("; ")}` : undefined;
+  if (error) console.error(error);
+  if (scope === "top" || error) {
+    await ctx.runMutation(api.legistar.recordSyncRun, { startedAt, finishedAt: Date.now(), ok: !error, error, scope });
   }
 }
 
@@ -30,13 +53,15 @@ async function recorded(ctx: ActionCtx, label: string, work: () => Promise<void>
 export const syncEvents = internalAction({
   args: { since: v.string(), until: v.optional(v.string()), bodyIds: v.array(v.number()) },
   handler: async (ctx, { since, until, bodyIds }) => {
-    await recorded(ctx, "syncEvents", async () => {
+    await recorded(ctx, "top", "syncEvents", async (c) => {
       const end = until ?? new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
       const raw = await legistarGet<Raw[]>("events", { $filter: eventsFilter(since, end, bodyIds) });
       for (const [i, r] of raw.entries()) {
-        const event = parseEvent(r);
-        await ctx.runMutation(api.legistar.upsertEvent, event);
-        await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncEvent, { eventId: event.legistarId });
+        await c.attempt(`event ${String(r.EventId)}`, async () => {
+          const event = parseEvent(r);
+          await ctx.runMutation(api.legistar.upsertEvent, event);
+          await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncEvent, { eventId: event.legistarId });
+        });
       }
     });
   },
@@ -47,17 +72,20 @@ export const syncEvents = internalAction({
 export const syncEvent = internalAction({
   args: { eventId: v.number() },
   handler: async (ctx, { eventId }) => {
-    await recorded(ctx, `syncEvent ${eventId}`, async () => {
+    await recorded(ctx, "child", `syncEvent ${eventId}`, async (c) => {
       const items = (await legistarGet<Raw[]>(`events/${eventId}/eventitems`)).map(parseEventItem);
       for (const item of items) {
-        await ctx.runMutation(api.legistar.upsertEventItem, item);
-        if (!hasVotes(item)) continue;
-        const votes = (await legistarGet<Raw[]>(`eventitems/${item.legistarId}/votes`)).map((r) => parseVote(r, item.legistarId));
-        if (!votes.length) continue;
-        for (const vote of votes) await ctx.runMutation(api.legistar.ensurePerson, { legistarId: vote.personId, name: vote.personName });
-        await ctx.runMutation(api.legistar.replaceVotes, { eventItemId: item.legistarId, votes });
-        await ctx.runMutation(api.legistar.setEventItemTally, { eventItemLegistarId: item.legistarId, tally: computeTally(votes) });
+        await c.attempt(`item ${item.legistarId}`, async () => {
+          await ctx.runMutation(api.legistar.upsertEventItem, item);
+          if (!hasVotes(item)) return;
+          const votes = (await legistarGet<Raw[]>(`eventitems/${item.legistarId}/votes`)).map((r) => parseVote(r, item.legistarId));
+          if (!votes.length) return;
+          for (const vote of votes) await ctx.runMutation(api.legistar.upsertPerson, { legistarId: vote.personId, name: vote.personName });
+          await ctx.runMutation(api.legistar.replaceVotes, { eventItemId: item.legistarId, votes });
+          await ctx.runMutation(api.legistar.setEventItemTally, { eventItemLegistarId: item.legistarId, tally: computeTally(votes) });
+        });
       }
+      // Scheduled regardless of per-item failures above.
       for (const [i, matterId] of matterIdsOf(items).entries()) {
         await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncMatter, { matterId });
       }
@@ -65,11 +93,12 @@ export const syncEvent = internalAction({
   },
 });
 
-// One matter: record, history steps, and attachment list (name + link).
+// One matter: record, history steps, and attachment list (name + link). Skipped if synced recently.
 export const syncMatter = internalAction({
   args: { matterId: v.number() },
   handler: async (ctx, { matterId }) => {
-    await recorded(ctx, `syncMatter ${matterId}`, async () => {
+    if (isMatterFresh(await ctx.runQuery(api.legistar.matterSyncedAt, { matterId }), Date.now())) return;
+    await recorded(ctx, "child", `syncMatter ${matterId}`, async (c) => {
       const matter = parseMatter(await legistarGet<Raw>(`matters/${matterId}`));
       const attachments = (await legistarGet<Raw[]>(`matters/${matterId}/attachments`)).flatMap((a) =>
         typeof a.MatterAttachmentHyperlink === "string" && a.MatterAttachmentHyperlink
@@ -80,26 +109,31 @@ export const syncMatter = internalAction({
       for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
         // Some rows carry no body (e.g. matter 74892 id 496081); a step with no body can't be shown, so skip it.
         if (typeof h.MatterHistoryActionBodyName !== "string") continue;
-        await ctx.runMutation(api.legistar.upsertHistory, parseHistory(h, matterId));
+        await c.attempt(`history ${String(h.MatterHistoryId)}`, async () => {
+          await ctx.runMutation(api.legistar.upsertHistory, parseHistory(h, matterId));
+        });
       }
+      // Only a fully clean pass counts as fresh; a partial one is retried next run.
+      if (!c.errors.length) await ctx.runMutation(api.legistar.markMatterSynced, { matterId, at: Date.now() });
     });
   },
 });
 
 // Current members of the three bodies (office record not yet ended); title becomes the role.
+// A person on several bodies gets one membership row per body.
 export const syncPersons = internalAction({
   args: {},
   handler: async (ctx) => {
-    await recorded(ctx, "syncPersons", async () => {
+    await recorded(ctx, "child", "syncPersons", async (c) => {
       const today = new Date().toISOString().slice(0, 10);
       for (const bodyId of BODY_IDS) {
         const rows = await legistarGet<Raw[]>("officerecords", { $filter: memberFilter(bodyId, today) });
         for (const r of rows) {
-          await ctx.runMutation(api.legistar.upsertPerson, {
-            legistarId: r.OfficeRecordPersonId as number,
-            name: r.OfficeRecordFullName as string,
-            bodyId,
-            role: typeof r.OfficeRecordTitle === "string" && r.OfficeRecordTitle ? r.OfficeRecordTitle : undefined,
+          await c.attempt(`officerecord ${String(r.OfficeRecordId)}`, async () => {
+            const legistarId = r.OfficeRecordPersonId as number;
+            await ctx.runMutation(api.legistar.upsertPerson, { legistarId, name: r.OfficeRecordFullName as string });
+            const role = typeof r.OfficeRecordTitle === "string" && r.OfficeRecordTitle ? r.OfficeRecordTitle : undefined;
+            await ctx.runMutation(api.legistar.upsertMembership, { personId: legistarId, bodyId, role });
           });
         }
       }
@@ -111,11 +145,13 @@ export const syncPersons = internalAction({
 export const syncAll = internalAction({
   args: { since: v.optional(v.string()) },
   handler: async (ctx, { since }) => {
-    await ctx.scheduler.runAfter(0, internal.sync.syncPersons, {});
-    await ctx.scheduler.runAfter(0, internal.sync.syncEvents, {
-      since: since ?? "2026-01-01",
-      until: "2026-12-31",
-      bodyIds: BODY_IDS,
+    await recorded(ctx, "top", "syncAll", async () => {
+      await ctx.scheduler.runAfter(0, internal.sync.syncPersons, {});
+      await ctx.scheduler.runAfter(0, internal.sync.syncEvents, {
+        since: since ?? "2026-01-01",
+        until: "2026-12-31",
+        bodyIds: BODY_IDS,
+      });
     });
   },
 });

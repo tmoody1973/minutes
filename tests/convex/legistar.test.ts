@@ -45,7 +45,13 @@ describe("idempotent upserts", () => {
     expect((await t.mutation(api.legistar.upsertMatter, { ...m, statusName: "Passed" })).changedFields).toEqual(["statusName"]);
     const p = { legistarId: 1, name: "A" };
     await t.mutation(api.legistar.upsertPerson, p);
-    expect(await t.mutation(api.legistar.upsertPerson, { ...p, role: "Chair" })).toEqual({ inserted: false, changedFields: ["role"] });
+    expect(await t.mutation(api.legistar.upsertPerson, { ...p, name: "B" })).toEqual({ inserted: false, changedFields: ["name"] });
+    // a person on two bodies keeps both memberships
+    await t.mutation(api.legistar.upsertMembership, { personId: 1, bodyId: 1, role: "1st District" });
+    await t.mutation(api.legistar.upsertMembership, { personId: 1, bodyId: 11, role: "Member" });
+    await t.mutation(api.legistar.upsertMembership, { personId: 1, bodyId: 11, role: "Chair" });
+    const ms = await t.run((ctx) => ctx.db.query("memberships").collect());
+    expect(ms.map((m) => `${m.bodyId}:${m.role}`).sort()).toEqual(["11:Chair", "1:1st District"]);
     await t.mutation(api.legistar.upsertEvent, future);
     await t.mutation(api.legistar.upsertEventItem, item);
     const tally = { aye: 4, no: 1, excused: 0, other: 0 };
@@ -120,8 +126,9 @@ describe("sync runs", () => {
   it("a failed run leaves rows untouched and lastSuccessfulSync returns the previous run", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(api.legistar.upsertEvent, event);
-    await t.mutation(api.legistar.recordSyncRun, { startedAt: 1, finishedAt: 2, ok: true });
-    await t.mutation(api.legistar.recordSyncRun, { startedAt: 3, finishedAt: 4, ok: false, error: "timeout" });
+    await t.mutation(api.legistar.recordSyncRun, { startedAt: 1, finishedAt: 2, ok: true, scope: "top" });
+    await t.mutation(api.legistar.recordSyncRun, { startedAt: 3, finishedAt: 4, ok: false, error: "timeout", scope: "top" });
+    await t.mutation(api.legistar.recordSyncRun, { startedAt: 5, finishedAt: 6, ok: true, scope: "child" });
     expect(await t.run((ctx) => ctx.db.query("events").collect())).toHaveLength(1);
     const last = await t.query(api.legistar.lastSuccessfulSync, {});
     expect(last).toMatchObject({ finishedAt: 2, ok: true });

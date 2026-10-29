@@ -23,3 +23,10 @@ export function matterIdsOf(items: { matterId?: number }[]): number[] {
 export function hasVotes(item: { actionName?: string; passed?: boolean }): boolean {
   return item.actionName !== undefined || item.passed !== undefined;
 }
+
+// A matter synced within this window is skipped: shared matters would otherwise be re-fetched once per event.
+export const MATTER_FRESH_MS = 20 * 60_000;
+
+export function isMatterFresh(syncedAt: number | null | undefined, now: number): boolean {
+  return syncedAt != null && now - syncedAt < MATTER_FRESH_MS;
+}

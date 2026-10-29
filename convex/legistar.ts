@@ -12,7 +12,7 @@ const CLEARABLE: Record<LegistarTable, string[]> = {
   eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder"],
   matters: ["introDate", "attachments"],
   histories: ["passed", "eventId"],
-  persons: ["bodyId", "role"],
+  persons: [],
 };
 
 // Insert or patch by legistarId. Compares incoming keys plus this table's clearable keys;
@@ -107,6 +107,20 @@ export const upsertMatter = mutation({
   handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
 });
 
+export const matterSyncedAt = query({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) =>
+    (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.syncedAt ?? null,
+});
+
+export const markMatterSynced = mutation({
+  args: { matterId: v.number(), at: v.number() },
+  handler: async (ctx, { matterId, at }) => {
+    const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
+    if (row) await ctx.db.patch(row._id, { syncedAt: at });
+  },
+});
+
 export const upsertHistory = mutation({
   args: {
     legistarId: v.number(),
@@ -133,19 +147,22 @@ export const upsertHistory = mutation({
 });
 
 export const upsertPerson = mutation({
-  args: { legistarId: v.number(), name: v.string(), bodyId: v.optional(v.number()), role: v.optional(v.string()) },
+  args: { legistarId: v.number(), name: v.string() },
   handler: async (ctx, args) => out(await upsert(ctx, "persons", args)),
 });
 
-// Vote-derived person: insert if missing, never overwrite (would clear bodyId/role set from officerecords).
-export const ensurePerson = mutation({
-  args: { legistarId: v.number(), name: v.string() },
+// Keyed on (personId, bodyId); a person can hold seats on several bodies.
+export const upsertMembership = mutation({
+  args: { personId: v.number(), bodyId: v.number(), role: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const row = await ctx.db.query("persons").withIndex("by_legistarId", (q) => q.eq("legistarId", args.legistarId)).unique();
-    if (!row) await ctx.db.insert("persons", args);
+    const rows = await ctx.db.query("memberships").withIndex("by_person", (q) => q.eq("personId", args.personId)).collect();
+    const row = rows.find((r) => r.bodyId === args.bodyId);
+    if (!row) return void (await ctx.db.insert("memberships", args));
+    if (row.role !== args.role) await ctx.db.patch(row._id, { role: args.role });
   },
 });
 
+// Vote-derived person: insert if missing, never overwrite (would clear bodyId/role set from officerecords).
 export const setEventItemTally = mutation({
   args: { eventItemLegistarId: v.number(), tally: tallyV },
   handler: async (ctx, { eventItemLegistarId, tally }) => {
@@ -174,7 +191,7 @@ export const replaceVotes = mutation({
 });
 
 export const recordSyncRun = mutation({
-  args: { startedAt: v.number(), finishedAt: v.number(), ok: v.boolean(), error: v.optional(v.string()) },
+  args: { startedAt: v.number(), finishedAt: v.number(), ok: v.boolean(), error: v.optional(v.string()), scope: v.union(v.literal("top"), v.literal("child")) },
   handler: async (ctx, args) => {
     await ctx.db.insert("syncRuns", args);
   },
@@ -184,7 +201,7 @@ export const lastSuccessfulSync = query({
   args: {},
   handler: async (ctx) => {
     const runs = ctx.db.query("syncRuns").withIndex("by_finishedAt").order("desc");
-    for await (const r of runs) if (r.ok) return r;
+    for await (const r of runs) if (r.ok && r.scope === "top") return r;
     return null;
   },
 });
