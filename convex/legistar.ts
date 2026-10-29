@@ -141,6 +141,20 @@ export const getMatterParcels = internalQuery({
     (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.parcels ?? null,
 });
 
+export const getMatterByFileNumber = internalQuery({
+  args: { fileNumber: v.string() },
+  handler: async (ctx, { fileNumber }) => (await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first()) ?? null,
+});
+
+export const setExhibitCheck = internalMutation({
+  args: { fileNumber: v.string(), agrees: v.boolean(), iou: v.number(), checkedAt: v.number() },
+  handler: async (ctx, { fileNumber, ...exhibitCheck }) => {
+    const row = await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first();
+    if (!row) throw new Error(`no matter with file number ${fileNumber}`);
+    await ctx.db.patch(row._id, { exhibitCheck });
+  },
+});
+
 export const matterSyncedAt = internalQuery({
   args: { matterId: v.number() },
   handler: async (ctx, { matterId }) =>
