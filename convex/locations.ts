@@ -15,7 +15,11 @@ export async function syncMatterLocation(ctx: MutationCtx, matterId: number): Pr
     return;
   }
   const next = { matterId, fileNumber: m.fileNumber, title: m.title, kind, statusName: m.statusName, centroids };
-  if (existing) await ctx.db.replace(existing._id, next);
+  if (existing) {
+    // Compare field by field (key order is not guaranteed); identical means no write and no reactive churn.
+    const same = (Object.keys(next) as (keyof typeof next)[]).every((k) => JSON.stringify(existing[k]) === JSON.stringify(next[k]));
+    if (!same) await ctx.db.replace(existing._id, next);
+  }
   else await ctx.db.insert("matterLocations", next);
 }
 

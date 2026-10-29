@@ -136,4 +136,24 @@ describe("buildTimeline", () => {
     const steps = buildTimeline(matter, [], [item(5, 20004, 99999)], [council], new Map(), NOW);
     expect(steps).toEqual([]);
   });
+
+  describe("hearing in progress (Ruling 40)", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const today = ev(20010, 1, "COMMON COUNCIL", "2026-10-29T09:00:00-05:00"); // earlier today than NOW (12:00)
+    const todays = item(900010, 20010, 74560);
+    it("a past item with no history row for that body+date is an ON AGENDA step", () => {
+      const last = buildTimeline(matter, histories(74560), [...items, todays], [...events, today], new Map(), NOW).at(-1)!;
+      expect(last).toMatchObject({ body: "Common Council", date: "2026-10-29", actions: ["ON AGENDA"], upcoming: false, eventId: 20010, eventItemId: 900010 });
+    });
+    it("once a history row exists for that body+date, there is no ON AGENDA step", () => {
+      const h = { ...histories(74560)[0], legistarId: 2, bodyName: "COMMON COUNCIL", date: "2026-10-29T00:00:00", actionName: "PASSED" };
+      const steps = buildTimeline(matter, [...histories(74560), h], [...items, todays], [...events, today], new Map(), NOW);
+      expect(steps.some((s) => s.actions.includes("ON AGENDA"))).toBe(false);
+      expect(steps.filter((s) => s.date === "2026-10-29")).toHaveLength(1);
+    });
+    it("a removed item makes no ON AGENDA step", () => {
+      const steps = buildTimeline(matter, histories(74560), [...items, { ...todays, removedAt: 1 }], [...events, today], new Map(), NOW);
+      expect(steps.some((s) => s.actions.includes("ON AGENDA"))).toBe(false);
+    });
+  });
 });

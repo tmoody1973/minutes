@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
+import { syncMatterLocation } from "../../convex/locations";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 const REZ = "A substitute ordinance relating to a change in zoning from RT4 to LB2 for the property located at 1 N Test St.";
@@ -61,6 +62,19 @@ describe("filesNear", () => {
     expect((await t.query(api.near.filesNear, { ...CENTER, filter: "decided" })).map((x) => x.fileNumber)).toEqual(["A2", "A7"]);
     expect((await t.query(api.near.filesNear, { ...CENTER, radiusMi: 0.15, filter: "all" })).map((x) => x.fileNumber)).toEqual(["A2"]);
   });
+  it("upcoming also includes matters with an ON AGENDA item from the last 7 days; nextHearing stays future-only", async () => {
+    const t = await seed();
+    const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("events", { legistarId: 20, bodyId: 1, bodyName: "Council", startsAt: ago(0.1) });
+      await ctx.db.insert("events", { legistarId: 21, bodyId: 1, bodyName: "Council", startsAt: ago(10) });
+      await ctx.db.insert("eventItems", { legistarId: 200, eventId: 20, sequence: 1, matterId: 2, title: "t" }); // A2: in progress
+      await ctx.db.insert("eventItems", { legistarId: 201, eventId: 21, sequence: 1, matterId: 7, title: "t" }); // A7: 10 days ago
+    });
+    const r = await t.query(api.near.filesNear, { ...CENTER, filter: "upcoming" });
+    expect(r.map((x) => x.fileNumber)).toEqual(["A2", "A1"]);
+    expect(r.find((x) => x.fileNumber === "A2")!.nextHearing).toBeUndefined();
+  });
   it("validates arguments", async () => {
     const t = await seed();
     const q = (a: object) => t.query(api.near.filesNear, { ...CENTER, filter: "all", ...a } as never);
@@ -108,6 +122,19 @@ describe("matterLocations is maintained with the matter", () => {
     await t.mutation(internal.locations.backfillMatterLocations, {});
     expect(await locs(t)).toHaveLength(3);
   });
+  it("an identical re-sync writes nothing to matterLocations", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertMatter, base);
+    await t.mutation(internal.legistar.setMatterParcels, { matterId: 1, parcels: [near(0.1)] });
+    const writes = await t.run(async (ctx) => {
+      const spies = (["replace", "patch", "insert", "delete"] as const).map((k) => vi.spyOn(ctx.db, k));
+      await syncMatterLocation(ctx, 1);
+      return spies.reduce((n, sp) => n + sp.mock.calls.length, 0);
+    });
+    expect(writes).toBe(0);
+    await t.mutation(internal.legistar.upsertMatter, { ...base, statusName: "Passed" });
+    expect(await locs(t)).toMatchObject([{ statusName: "Passed" }]);
+  });
   it("filesNear never reads matters", async () => {
     const t = await seed();
     await t.run(async (ctx) => { for (const m of await ctx.db.query("matters").collect()) await ctx.db.delete(m._id); });
@@ -148,6 +175,16 @@ describe("geocode rate limit", () => {
     for (let i = 0; i < 60; i++) expect(await t.action(api.near.geocode, { text: "1 main st" })).toEqual({ error: "not-found" });
     expect(await t.action(api.near.geocode, { text: "1 main st" })).toEqual({ error: "busy" });
     expect(calls).toHaveLength(60);
+    vi.unstubAllGlobals();
+  });
+  it("empty or over-long input is refused before a rate-limit token is taken", async () => {
+    const t = convexTest(schema, modules);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(await t.action(api.near.geocode, { text: "   " })).toEqual({ error: "not-found" });
+    expect(await t.action(api.near.geocode, { text: "x".repeat(201) })).toEqual({ error: "not-found" });
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

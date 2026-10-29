@@ -1,7 +1,7 @@
 const USER_AGENT = "Minutes/0.1 (tarik@radiomilwaukee.org)";
 const CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress";
 const EARTH_RADIUS_MI = 3958.8;
-const MAX_INPUT = 200;
+export const MAX_GEOCODE_INPUT = 200;
 const TIMEOUT_MS = 15_000;
 
 export interface LatLng {
@@ -36,7 +36,7 @@ const placeOf = (m: CensusMatch): string | null => m.geographies?.["Incorporated
  */
 export async function geocodeUserAddress(text: string, opts: GeocodeOptions = {}): Promise<GeocodeResult> {
   const address = text.trim();
-  if (!address || address.length > MAX_INPUT) return { error: "not-found" };
+  if (!address || address.length > MAX_GEOCODE_INPUT) return { error: "not-found" };
   const fetchImpl = opts.fetchImpl ?? ((u, i) => fetch(u, i));
   const qs = new URLSearchParams({ address, benchmark: "Public_AR_Current", vintage: "Current_Current", layers: "Incorporated Places", format: "json" });
   let matches: CensusMatch[];

@@ -28,7 +28,7 @@ function link(it: EventItemRecord | undefined, tallies: Map<number, Tally>): Par
   };
 }
 
-// Pure: steps come only from stored Legistar history rows plus future agenda items (Ruling 28).
+// Pure: steps come only from stored Legistar history rows plus agenda items without a history row (Ruling 28, 40).
 export function buildTimeline(
   matter: MatterRecord,
   histories: HistoryRecord[],
@@ -65,15 +65,18 @@ export function buildTimeline(
   for (const [step, seen] of outcomes) if (seen.size === 1) step.passed = [...seen][0];
 
   const eventById = new Map(events.map((e) => [e.legistarId, e]));
-  const future = live.filter((i) => i.matterId === matter.legistarId && new Date(eventById.get(i.eventId)?.startsAt ?? 0) > now);
+  const mine = live.filter((i) => i.matterId === matter.legistarId && eventById.has(i.eventId));
   const byEvent = new Map<number, EventItemRecord[]>();
-  for (const i of future) byEvent.set(i.eventId, [...(byEvent.get(i.eventId) ?? []), i]);
+  for (const i of mine) byEvent.set(i.eventId, [...(byEvent.get(i.eventId) ?? []), i]);
   for (const [eventId, rows] of byEvent) {
     const ev = eventById.get(eventId)!;
     const body = label(ev.bodyName);
     const date = day(ev.startsAt);
     if (byKey.has(`${body}|${date}`)) continue;
-    const step: TimelineStep = { body, date, actions: ["SCHEDULED"], eventId, eventItemId: pick(rows).legistarId, upcoming: true };
+    // Future: SCHEDULED. Past with no history row for the same body+date: the hearing is in progress or the
+    // clerk has not posted the outcome yet, so say only that it is on the agenda.
+    const upcoming = new Date(ev.startsAt) > now;
+    const step: TimelineStep = { body, date, actions: [upcoming ? "SCHEDULED" : "ON AGENDA"], eventId, eventItemId: pick(rows).legistarId, upcoming };
     byKey.set(`${body}|${date}`, step);
     steps.push(step);
   }
