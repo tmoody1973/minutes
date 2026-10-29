@@ -121,7 +121,7 @@ async function main() {
   const reconfirm = args.includes("--reconfirm");
   const reparts = args.includes("--reparts");
   const eventId = Number(args.find((a) => !a.startsWith("--")));
-  if (!eventId) throw new Error("usage: ingest-meeting.ts <eventId> [--reconfirm]");
+  if (!eventId) throw new Error("usage: ingest-meeting.ts <eventId> [--reconfirm] [--reparts]");
   const ev = convexRun<{ bodyId: number; clipId: number | null } | null>("media:eventByLegistarId", { legistarId: eventId });
   if (!ev) throw new Error(`event ${eventId} not found in Convex`);
 

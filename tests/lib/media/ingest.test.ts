@@ -69,10 +69,13 @@ describe("partsDecision", () => {
 });
 
 describe("outageRow", () => {
-  const fresh = { eventItemId: 1, located: "cue", parts: [] };
-  it("keeps the old parts, source and fingerprint", () => {
-    const old = { eventItemId: 1, located: "cue", parts: [{ kind: "testimony", startMs: 1, endMs: 2 }], partsSource: "model" as const, namesFingerprint: "f" };
-    expect(outageRow(fresh, old)).toEqual(old);
+  const fresh = { eventItemId: 1, located: "cue", startMs: 1, endMs: 2, parts: [] };
+  const old = { eventItemId: 1, located: "cue", startMs: 1, endMs: 2, parts: [{ kind: "testimony", startMs: 1, endMs: 2 }], partsSource: "model" as const, namesFingerprint: "f" };
+  it("keeps the old parts, source and fingerprint when the window is unchanged", () => expect(outageRow(fresh, old)).toEqual(old));
+  it("returns the bare unattempted row when the window moved", () => {
+    const moved = { ...fresh, endMs: 3 };
+    expect(outageRow(moved, old)).toEqual(moved);
+    expect(outageRow({ ...fresh, startMs: 0 }, old)).not.toHaveProperty("namesFingerprint");
   });
   it("falls back to the bare row when there is no old row", () => expect(outageRow(fresh, undefined)).toEqual(fresh));
 });

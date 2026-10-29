@@ -49,9 +49,10 @@ export function partsDecision(a: { old: StoredParts | undefined; window: { start
 }
 
 // Model outage while refreshing: keep what was stored (parts, source, fingerprint) rather than blank it.
-type PartsFields = { parts: unknown[]; partsSource?: "model" | "none"; partsReason?: string; namesFingerprint?: string };
-export function outageRow<T extends { parts: unknown[] }>(bare: T, old: PartsFields | undefined): T & Partial<PartsFields> {
-  if (!old?.partsSource) return bare;
+type PartsFields = { startMs?: number; endMs?: number; parts: unknown[]; partsSource?: "model" | "none"; partsReason?: string; namesFingerprint?: string };
+// Only valid for the same window: old parts pinned to a moved window would be reused forever.
+export function outageRow<T extends { parts: unknown[]; startMs?: number; endMs?: number }>(bare: T, old: PartsFields | undefined): T & Partial<PartsFields> {
+  if (!old?.partsSource || old.startMs !== bare.startMs || old.endMs !== bare.endMs) return bare;
   const { parts, partsSource, partsReason, namesFingerprint } = old;
   return { ...bare, parts, partsSource, ...(partsReason ? { partsReason } : {}), ...(namesFingerprint ? { namesFingerprint } : {}) };
 }
