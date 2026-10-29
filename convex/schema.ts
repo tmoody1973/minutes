@@ -4,6 +4,18 @@ import { v } from "convex/values";
 // Field names mirror lib/types.ts (the source of truth).
 export const tallyV = v.object({ aye: v.number(), no: v.number(), excused: v.number(), other: v.number() });
 
+// One lot named in a matter title. Unknown MPROP values are null (never 0 / ""). Shared with legistar.ts.
+export const parcelV = v.object({
+  taxkey: v.string(),
+  address: v.string(),
+  zoning: v.union(v.string(), v.null()),
+  alder: v.union(v.number(), v.null()),
+  lotAreaSqFt: v.union(v.number(), v.null()),
+  owner: v.union(v.string(), v.null()),
+  polygon: v.union(v.any(), v.null()),
+  centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
+});
+
 export default defineSchema({
   bodies: defineTable({ legistarId: v.number(), name: v.string() }).index("by_legistarId", ["legistarId"]),
   events: defineTable({
@@ -49,20 +61,7 @@ export default defineSchema({
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
     // Lots named in the title, from MPROP + the city parcel map. Unset = title has no addresses (or never looked up);
     // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
-    parcels: v.optional(
-      v.array(
-        v.object({
-          taxkey: v.string(),
-          address: v.string(),
-          zoning: v.string(),
-          alder: v.union(v.number(), v.null()),
-          lotAreaSqFt: v.number(),
-          owner: v.string(),
-          polygon: v.union(v.any(), v.null()),
-          centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
-        }),
-      ),
-    ),
+    parcels: v.optional(v.array(parcelV)),
   }).index("by_legistarId", ["legistarId"]),
   histories: defineTable({
     legistarId: v.number(),

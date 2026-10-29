@@ -154,11 +154,15 @@ describe("resolveParcels", () => {
   });
   it("one failing address is reported and the rest still resolve", async () => {
     const { resolveParcels } = await import("@/lib/geo/mprop");
-    const bad: Address = { houseNumber: 1, dir: "S", street: "x'--" };
-    const { parcels, errors } = await resolveParcels([bad, SOUTHGATE], { fetchImpl: fakeFetch(southgate, parcel5331104000) });
+    const other: Address = { houseNumber: 5, dir: "N", street: "OTHER", type: "ST" };
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("OTHER")) return new Response("x", { status: 500 });
+      return ok(url.includes("milwaukeemaps") ? parcel5331104000 : southgate);
+    });
+    const { parcels, errors } = await resolveParcels([other, SOUTHGATE], { fetchImpl });
     expect(parcels.map((p) => p.taxkey)).toEqual(["5331104000"]);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/^address 1 S x'--: /);
+    expect(errors[0]).toMatch(/^address 5 N OTHER ST: /);
   });
   it("a polygon failure keeps the lot with no outline", async () => {
     const { resolveParcels } = await import("@/lib/geo/mprop");
@@ -166,5 +170,104 @@ describe("resolveParcels", () => {
     const { parcels, errors } = await resolveParcels([SOUTHGATE], { fetchImpl });
     expect(parcels[0]).toMatchObject({ taxkey: "5331104000", polygon: null, centroid: null });
     expect(errors[0]).toMatch(/^polygon 5331104000/);
+  });
+});
+
+// ---- Ruling 33 ----
+const row = (o: Record<string, string>) => ({ ...southgate.result.records[0], ...o });
+const rows = (...r: object[]) => ({ result: { total: r.length, records: r } });
+
+describe("Ruling 33: parity", () => {
+  it("3472 S 27TH does not match the odd-start 3441-3473 row; 3473 does", async () => {
+    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472 }, { fetchImpl: fakeFetch(southgate) })).toEqual([]);
+    expect((await lookupParcels(SOUTHGATE, { fetchImpl: fakeFetch(southgate) })).map((p) => p.taxkey)).toEqual(["5331104000"]);
+  });
+  it("parity applies to address ranges too; single-number rows ignore parity", async () => {
+    const evenRange = { ...SOUTHGATE, houseNumber: 3472, houseNumberHigh: 3472 };
+    expect(await lookupParcels(evenRange, { fetchImpl: fakeFetch(southgate) })).toEqual([]);
+    // 3472-3474 contains odd 3473 which is on the row
+    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472, houseNumberHigh: 3474 }, { fetchImpl: fakeFetch(southgate) })).toHaveLength(1);
+    const single = rows(row({ HOUSE_NR_LO: "3472", HOUSE_NR_HI: "3472" }));
+    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472 }, { fetchImpl: fakeFetch(single) })).toHaveLength(1);
+  });
+});
+
+describe("Ruling 33: address without a type", () => {
+  const noType: Address = { houseNumber: 3473, dir: "S", street: "27TH" };
+  it("matches when exactly one row matches across types", async () => {
+    expect(await lookupParcels(noType, { fetchImpl: fakeFetch(southgate) })).toHaveLength(1);
+  });
+  it("matches nothing when several rows match", async () => {
+    const two = rows(row({}), row({ TAXKEY: "5331104001", STTYPE: "AV" }));
+    expect(await lookupParcels(noType, { fetchImpl: fakeFetch(two) })).toEqual([]);
+    const { parcels } = await (await import("@/lib/geo/mprop")).resolveParcels([noType], { fetchImpl: fakeFetch(two, parcel5331104000) });
+    expect(parcels).toEqual([]);
+  });
+});
+
+describe("Ruling 33: caps", () => {
+  it("range span over 200 house numbers is invalid, before any fetch", async () => {
+    const fetchImpl = vi.fn();
+    await expect(lookupParcels({ ...SOUTHGATE, houseNumber: 100, houseNumberHigh: 301 }, { fetchImpl })).rejects.toBeInstanceOf(InvalidAddressError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    await expect(lookupParcels({ ...SOUTHGATE, houseNumber: 100, houseNumberHigh: 300 }, { fetchImpl: fakeFetch(southgate) })).resolves.toEqual([]);
+  });
+  it("more than 10 matching parcels: none returned, never truncated", async () => {
+    const many = rows(...Array.from({ length: 11 }, (_, i) => row({ TAXKEY: String(5331104000 + i), HOUSE_NR_LO: "3473", HOUSE_NR_HI: "3473" })));
+    expect(await lookupParcels(SOUTHGATE, { fetchImpl: fakeFetch(many) })).toEqual([]);
+    const ten = rows(...Array.from({ length: 10 }, (_, i) => row({ TAXKEY: String(5331104000 + i), HOUSE_NR_LO: "3473", HOUSE_NR_HI: "3473" })));
+    expect(await lookupParcels(SOUTHGATE, { fetchImpl: fakeFetch(ten) })).toHaveLength(10);
+  });
+  it("stops at 20 pages with an error", async () => {
+    const fetchImpl = vi.fn(async () => ok({ result: { total: 1000, records: [row({ HOUSE_NR_LO: "1", HOUSE_NR_HI: "1" })] } }));
+    await expect(lookupParcels(SOUTHGATE, { fetchImpl, pageSize: 1 })).rejects.toThrow(/pages/);
+    expect(fetchImpl).toHaveBeenCalledTimes(20);
+  });
+  it("sends sort=_id for stable paging", async () => {
+    const fetchImpl = fakeFetch(southgate);
+    await lookupParcels(SOUTHGATE, { fetchImpl });
+    expect(new URL((fetchImpl.mock.calls[0] as unknown as [string])[0]).searchParams.get("sort")).toBe("_id");
+  });
+  it("a response without result.total throws instead of reading as not found", async () => {
+    await expect(lookupParcels(SOUTHGATE, { fetchImpl: fakeFetch({ result: { records: [] } }) })).rejects.toThrow(/total/);
+  });
+});
+
+describe("Ruling 33: unknown values are null", () => {
+  it("711 E KILBOURN: LOT_AREA 0 -> null", async () => {
+    const p = await lookupParcel({ houseNumber: 711, dir: "E", street: "KILBOURN", type: "AV" }, { fetchImpl: fakeFetch(kilbourn) });
+    expect(p?.lotAreaSqFt).toBeNull();
+  });
+  it("empty zoning and owner -> null", async () => {
+    const r = rows(row({ ZONING: "", OWNER_NAME_1: "" }));
+    const p = await lookupParcel(SOUTHGATE, { fetchImpl: fakeFetch(r) });
+    expect(p).toMatchObject({ zoning: null, owner: null });
+  });
+});
+
+describe("Ruling 33: polygon and centroid safety", () => {
+  it("polygon whose TAXKEY differs from the request is null", async () => {
+    expect(await fetchParcelPolygon("3930942000", { fetchImpl: fakeFetch(null, parcel5331104000) })).toBeNull();
+  });
+  it("polygonCentroid returns null for empty or malformed rings", () => {
+    expect(polygonCentroid({ type: "Polygon", coordinates: [] })).toBeNull();
+    expect(polygonCentroid({ type: "Polygon", coordinates: [[]] })).toBeNull();
+    expect(polygonCentroid({ type: "Polygon", coordinates: [[["x", 1]]] } as never)).toBeNull();
+    expect(polygonCentroid({ type: "MultiPolygon", coordinates: [] })).toBeNull();
+  });
+  it("a centroid failure keeps the found lot", async () => {
+    const { resolveParcels } = await import("@/lib/geo/mprop");
+    const weird = { features: [{ properties: { TAXKEY: "5331104000" }, geometry: { type: "Polygon", coordinates: [[]] } }] };
+    const { parcels, errors } = await resolveParcels([SOUTHGATE], { fetchImpl: fakeFetch(southgate, weird) });
+    expect(parcels).toHaveLength(1);
+    expect(parcels[0].centroid).toBeNull();
+    expect(errors).toEqual([]);
+  });
+  it("InvalidAddressError addresses come back as skipped, not errors", async () => {
+    const { resolveParcels } = await import("@/lib/geo/mprop");
+    const bad: Address = { houseNumber: 1, dir: "S", street: "x'--" };
+    const r = await resolveParcels([bad], { fetchImpl: fakeFetch(southgate) });
+    expect(r.errors).toEqual([]);
+    expect(r.skipped).toHaveLength(1);
   });
 });

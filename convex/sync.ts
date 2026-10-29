@@ -114,16 +114,24 @@ export const syncMatter = internalAction({
           : [],
       );
       await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
-      // Lots named in the title. Left unset when there are no addresses; [] when there are but none resolved.
-      // On failure the error is recorded (no sync stamp) and any previously stored parcels stay as they were.
+      // Lots named in the title. parcels is replaced only when EVERY address resolved without error; otherwise the
+      // stored value stays and the failure is recorded (so the matter is not stamped fresh and is retried).
+      // No addresses clears parcels. Unset = no addresses; [] = addresses exist but none resolved.
       const addresses = extractAddresses(matter.title);
-      if (addresses.length) {
-        await c.attempt(`parcels`, async () => {
-          const { parcels, errors } = await resolveParcels(addresses);
-          errors.forEach((e) => c.errors.push(`parcels ${e}`));
-          // A lookup that errored may have hidden a lot; only write when every address was checked cleanly
-          // or at least one lot was found (never replace good data with a worse partial empty list).
-          if (!errors.length || parcels.length) await ctx.runMutation(internal.legistar.setMatterParcels, { matterId, parcels });
+      if (!addresses.length) {
+        await c.attempt("parcels", async () => {
+          await ctx.runMutation(internal.legistar.setMatterParcels, { matterId });
+        });
+      } else {
+        await c.attempt("parcels", async () => {
+          const { parcels, errors, skipped } = await resolveParcels(addresses);
+          // Refused addresses are final, not transient: log them but do not block the fresh stamp.
+          skipped.forEach((m) => console.warn(`syncMatter ${matterId}: skipped ${m}`));
+          if (errors.length) {
+            errors.forEach((e) => c.errors.push(`parcels ${e}`));
+            return;
+          }
+          await ctx.runMutation(internal.legistar.setMatterParcels, { matterId, parcels });
         });
       }
       for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
