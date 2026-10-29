@@ -5,6 +5,7 @@ const LEAD_PUNCT = /^[.,?!;:"'()]+/;
 const TRAIL_PUNCT = /[.,?!;:"'()]+$/;
 
 type Parts = { lead: string; core: string; trail: string };
+type Token = { text: string; start: number; end: number };
 
 function splitToken(token: string): Parts {
   const lead = token.match(LEAD_PUNCT)?.[0] ?? "";
@@ -13,36 +14,41 @@ function splitToken(token: string): Parts {
   return { lead, core: rest.slice(0, rest.length - trail.length), trail };
 }
 
-// Comparison key for a word, or null for punctuation-only tokens ("-", "--").
+// Only words with a letter in the core can collapse. Punctuation-only tokens
+// ("-") and numbers ("3", "1.") stay as heard.
 function wordKey(token: string): string | null {
   const { core } = splitToken(token);
-  return /[\p{L}\p{N}]/u.test(core) ? core.toLowerCase() : null;
+  return /\p{L}/u.test(core) ? core.toLowerCase() : null;
 }
 
-// One run of same-word tokens becomes its first token; the last token's
-// trailing punctuation is kept when the first token has none.
-function mergeRun(run: readonly string[]): string {
-  const first = run[0];
-  const lastTrail = splitToken(run[run.length - 1]).trail;
-  return splitToken(first).trail === "" && lastTrail !== "" ? first + lastTrail : first;
+// Keeps the first token's leading punctuation and casing, and the last
+// token's trailing punctuation: "no, no?" -> "no?", "the the," -> "the,".
+function mergeRun(run: readonly Token[]): string {
+  const { lead, core } = splitToken(run[0].text);
+  const { trail } = splitToken(run[run.length - 1].text);
+  return lead + core + trail;
 }
 
-function collapseRepeats(tokens: readonly string[]): { kept: string[]; changed: boolean } {
-  const kept: string[] = [];
-  let changed = false;
-  let i = 0;
-  while (i < tokens.length) {
-    const key = wordKey(tokens[i]);
-    let j = i + 1;
-    if (key !== null) {
-      while (j < tokens.length && wordKey(tokens[j]) === key) j++;
+function tokenize(text: string): Token[] {
+  return [...text.matchAll(/\S+/g)].map((m) => ({
+    text: m[0],
+    start: m.index,
+    end: m.index + m[0].length,
+  }));
+}
+
+function groupRuns(tokens: readonly Token[]): Token[][] {
+  const runs: Token[][] = [];
+  for (const token of tokens) {
+    const run = runs[runs.length - 1];
+    const key = wordKey(token.text);
+    if (run && key !== null && wordKey(run[run.length - 1].text) === key) {
+      run.push(token);
+    } else {
+      runs.push([token]);
     }
-    const run = tokens.slice(i, j);
-    if (run.length > 1) changed = true;
-    kept.push(run.length > 1 ? mergeRun(run) : run[0]);
-    i = j;
   }
-  return { kept, changed };
+  return runs;
 }
 
 function correctToken(token: string, corrections: ReadonlyMap<string, string>): string {
@@ -54,11 +60,18 @@ function correctToken(token: string, corrections: ReadonlyMap<string, string>): 
   return fixed === undefined ? token : lead + fixed + trail;
 }
 
+// Text outside an edit is copied byte-for-byte, so line breaks and double
+// spaces survive. Only a collapsed run is replaced, with the original
+// separator before it kept.
 export function cleanQuote(text: string, corrections: ReadonlyMap<string, string>): string {
-  const tokens = text.split(/\s+/).filter((t) => t !== "");
-  const { kept, changed } = collapseRepeats(tokens);
-  const corrected = kept.map((t) => correctToken(t, corrections));
-  const correctedAny = corrected.some((t, i) => t !== kept[i]);
-  if (!changed && !correctedAny) return text;
-  return corrected.join(" ");
+  let out = "";
+  let cursor = 0;
+  for (const run of groupRuns(tokenize(text))) {
+    const first = run[0];
+    const last = run[run.length - 1];
+    const word = run.length > 1 ? mergeRun(run) : first.text;
+    out += text.slice(cursor, first.start) + correctToken(word, corrections);
+    cursor = last.end;
+  }
+  return out + text.slice(cursor);
 }
