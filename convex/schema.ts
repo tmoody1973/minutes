@@ -29,6 +29,8 @@ export default defineSchema({
     mover: v.optional(v.string()),
     seconder: v.optional(v.string()),
     tally: v.optional(tallyV),
+    // ms timestamp when upstream stopped listing this item on the agenda; cleared if it reappears.
+    removedAt: v.optional(v.number()),
   })
     .index("by_legistarId", ["legistarId"])
     .index("by_event", ["eventId"])

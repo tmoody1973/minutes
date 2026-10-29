@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { tallyV } from "./schema";
 
 type Upserted = { inserted: boolean; changedFields: string[] };
@@ -9,7 +9,7 @@ type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "person
 // fields written by other mutations (eventItems.tally).
 const CLEARABLE: Record<LegistarTable, string[]> = {
   events: ["clipId", "agendaUrl", "minutesUrl", "insiteUrl"],
-  eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder"],
+  eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder", "removedAt"],
   matters: ["introDate", "attachments"],
   histories: ["passed", "eventId"],
   persons: [],
@@ -47,7 +47,7 @@ async function recordChange(
 
 const out = ({ inserted, changedFields }: Upserted & { id?: unknown }): Upserted => ({ inserted, changedFields });
 
-export const upsertEvent = mutation({
+export const upsertEvent = internalMutation({
   args: {
     legistarId: v.number(),
     bodyId: v.number(),
@@ -61,7 +61,7 @@ export const upsertEvent = mutation({
   handler: async (ctx, args) => out(await upsert(ctx, "events", args)),
 });
 
-export const upsertEventItem = mutation({
+export const upsertEventItem = internalMutation({
   args: {
     legistarId: v.number(),
     eventId: v.number(),
@@ -86,7 +86,8 @@ export const upsertEventItem = mutation({
           matterId: args.matterId,
           eventId: args.eventId,
           at: new Date().toISOString(),
-          sourceKey: `eventitem:${args.legistarId}`,
+          // One per matter per meeting: a matter listed twice, or on a republished agenda, is still one hearing.
+          sourceKey: `hearing:${args.matterId}:${args.eventId}`,
         });
       }
     }
@@ -94,7 +95,17 @@ export const upsertEventItem = mutation({
   },
 });
 
-export const upsertMatter = mutation({
+// Marks stored items of an event that upstream no longer lists. Never deletes; keeps the first removedAt.
+export const markEventItemsRemoved = internalMutation({
+  args: { eventId: v.number(), presentIds: v.array(v.number()), at: v.number() },
+  handler: async (ctx, { eventId, presentIds, at }) => {
+    const present = new Set(presentIds);
+    const rows = await ctx.db.query("eventItems").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
+    for (const r of rows) if (!present.has(r.legistarId) && r.removedAt === undefined) await ctx.db.patch(r._id, { removedAt: at });
+  },
+});
+
+export const upsertMatter = internalMutation({
   args: {
     legistarId: v.number(),
     fileNumber: v.string(),
@@ -107,13 +118,13 @@ export const upsertMatter = mutation({
   handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
 });
 
-export const matterSyncedAt = query({
+export const matterSyncedAt = internalQuery({
   args: { matterId: v.number() },
   handler: async (ctx, { matterId }) =>
     (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.syncedAt ?? null,
 });
 
-export const markMatterSynced = mutation({
+export const markMatterSynced = internalMutation({
   args: { matterId: v.number(), at: v.number() },
   handler: async (ctx, { matterId, at }) => {
     const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
@@ -121,7 +132,7 @@ export const markMatterSynced = mutation({
   },
 });
 
-export const upsertHistory = mutation({
+export const upsertHistory = internalMutation({
   args: {
     legistarId: v.number(),
     matterId: v.number(),
@@ -146,13 +157,13 @@ export const upsertHistory = mutation({
   },
 });
 
-export const upsertPerson = mutation({
+export const upsertPerson = internalMutation({
   args: { legistarId: v.number(), name: v.string() },
   handler: async (ctx, args) => out(await upsert(ctx, "persons", args)),
 });
 
 // Keyed on (personId, bodyId); a person can hold seats on several bodies.
-export const upsertMembership = mutation({
+export const upsertMembership = internalMutation({
   args: { personId: v.number(), bodyId: v.number(), role: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const rows = await ctx.db.query("memberships").withIndex("by_person", (q) => q.eq("personId", args.personId)).collect();
@@ -162,8 +173,7 @@ export const upsertMembership = mutation({
   },
 });
 
-// Vote-derived person: insert if missing, never overwrite (would clear bodyId/role set from officerecords).
-export const setEventItemTally = mutation({
+export const setEventItemTally = internalMutation({
   args: { eventItemLegistarId: v.number(), tally: tallyV },
   handler: async (ctx, { eventItemLegistarId, tally }) => {
     const row = await ctx.db
@@ -177,7 +187,7 @@ export const setEventItemTally = mutation({
 
 const voteV = v.object({ eventItemId: v.number(), personId: v.number(), personName: v.string(), value: v.string() });
 
-export const replaceVotes = mutation({
+export const replaceVotes = internalMutation({
   args: { eventItemId: v.number(), votes: v.array(voteV) },
   handler: async (ctx, { eventItemId, votes }): Promise<Upserted> => {
     const old = await ctx.db.query("votes").withIndex("by_eventItem", (q) => q.eq("eventItemId", eventItemId)).collect();
@@ -190,7 +200,7 @@ export const replaceVotes = mutation({
   },
 });
 
-export const recordSyncRun = mutation({
+export const recordSyncRun = internalMutation({
   args: { startedAt: v.number(), finishedAt: v.number(), ok: v.boolean(), error: v.optional(v.string()), scope: v.union(v.literal("top"), v.literal("child")) },
   handler: async (ctx, args) => {
     await ctx.db.insert("syncRuns", args);
