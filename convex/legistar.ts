@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
-import { parcelV, tallyV } from "./schema";
+import { boxV, parcelV, tallyV } from "./schema";
 import { syncMatterLocation } from "./locations";
 
 type Upserted = { inserted: boolean; changedFields: string[] };
@@ -147,11 +147,20 @@ export const getMatterByFileNumber = internalQuery({
 });
 
 export const setExhibitCheck = internalMutation({
-  args: { fileNumber: v.string(), agrees: v.boolean(), iou: v.number(), checkedAt: v.number() },
+  args: {
+    fileNumber: v.string(),
+    noConflict: v.boolean(),
+    iou: v.number(),
+    method: v.literal("point-prompt"),
+    colorBox: v.union(boxV, v.null()),
+    samBox: v.union(boxV, v.null()),
+    reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),
+    checkedAt: v.number(),
+  },
   handler: async (ctx, { fileNumber, ...exhibitCheck }) => {
     const row = await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first();
     if (!row) throw new Error(`no matter with file number ${fileNumber}`);
-    await ctx.db.patch(row._id, { exhibitCheck });
+    await ctx.db.patch(row._id, { exhibitCheck }); // patch replaces the whole nested object, so no stale legacy fields survive
   },
 });
 

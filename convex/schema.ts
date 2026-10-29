@@ -16,6 +16,8 @@ export const parcelV = v.object({
   centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
 });
 
+export const boxV = v.object({ x1: v.number(), y1: v.number(), x2: v.number(), y2: v.number() });
+
 export default defineSchema({
   bodies: defineTable({ legistarId: v.number(), name: v.string() }).index("by_legistarId", ["legistarId"]),
   events: defineTable({
@@ -62,9 +64,19 @@ export default defineSchema({
     // Lots named in the title, from MPROP + the city parcel map. Unset = title has no addresses (or never looked up);
     // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
     parcels: v.optional(v.array(parcelV)),
-    // SAM cross-check of the exhibit map's "Subject Site" outline vs. the color-detected one. Never changes what is drawn.
-    // Written only by setExhibitCheck (not in CLEARABLE, so matter upserts leave it alone).
-    exhibitCheck: v.optional(v.object({ agrees: v.boolean(), iou: v.number(), checkedAt: v.number() })),
+    // Point-prompted SAM check of the exhibit map's "Subject Site" outline against the color-detected one. It records
+    // whether the two conflict; it never changes what is drawn. Written only by setExhibitCheck (replaced whole each run).
+    // `agrees` is the legacy field from the first (box-prompted, circular) version: kept so old rows validate, never written.
+    exhibitCheck: v.optional(v.object({
+      agrees: v.optional(v.boolean()),
+      noConflict: v.optional(v.boolean()),
+      iou: v.number(),
+      method: v.optional(v.literal("point-prompt")),
+      colorBox: v.optional(v.union(boxV, v.null())),
+      samBox: v.optional(v.union(boxV, v.null())),
+      reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),
+      checkedAt: v.number(),
+    })),
   }).index("by_legistarId", ["legistarId"]),
   // Slim read model for near-me: one row per zoning-kind matter that has at least one parcel centroid.
   // Maintained by upsertMatter / setMatterParcels (convex/locations.ts); no polygons, so reads stay small.

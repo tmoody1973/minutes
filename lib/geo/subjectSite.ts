@@ -32,6 +32,7 @@ function decodePng(png: Buffer): Image | null {
   if (!w || !h) return null;
   const raw = inflateSync(Buffer.concat(idat));
   const stride = w * ch;
+  if (raw.length < h * (stride + 1)) return null; // truncated or corrupt IDAT
   const px = new Uint8Array(h * stride);
   for (let y = 0; y < h; y++) {
     const filter = raw[y * (stride + 1)];
@@ -61,7 +62,8 @@ const dist = (a: Rgb, b: Rgb) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2
  * Bounding box of the "Subject Site" dashed outline on a city exhibit map.
  * ponytail: assumes the exhibit layout (map left, legend panel in the right ~36%, "Subject Site" the first legend swatch
  * near the top). Learns the swatch color from that corner, then boxes matching pixels left of it. A different layout
- * returns null (or a wrong box the SAM/IoU check will flag) rather than guessing.
+ * returns null when nothing plausible is found. A wrong-but-plausible color box is NOT caught by the SAM check (SAM is
+ * prompted from this box's center), so the sanity bounds below are the only guard.
  */
 export function findSubjectSiteBox(png: Buffer): Box | null {
   const img = decodePng(png);
@@ -109,7 +111,16 @@ export function findSubjectSiteBox(png: Buffer): Box | null {
     }
     if (!best || group.n > best.n) best = group;
   }
-  return best && best.n >= 50 ? { x1: best.x1, y1: best.y1, x2: best.x2, y2: best.y2 } : null;
+  if (!best || best.n < 50) return null;
+  const box = { x1: best.x1, y1: best.y1, x2: best.x2, y2: best.y2 };
+  return plausible(box, img.w, img.h) ? box : null;
+}
+
+// A real subject-site outline is a lot-sized, roughly compact shape that sits inside the map frame.
+function plausible(b: Box, w: number, h: number): boolean {
+  const bw = b.x2 - b.x1 + 1, bh = b.y2 - b.y1 + 1;
+  const aspect = bw / bh, area = (bw * bh) / (w * h);
+  return aspect >= 0.2 && aspect <= 5 && area >= 0.005 && area <= 0.4 && b.x1 > 0 && b.y1 > 0 && b.x2 < w - 1 && b.y2 < h - 1;
 }
 
 export function pngSize(png: Buffer): { w: number; h: number } {
@@ -137,16 +148,16 @@ export function iou(a: Box, b: Box): number {
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
-/** Ask SAM 3.1 to segment the object inside `box`. Returns its box (+mask) or null when SAM finds nothing. */
+/** Ask SAM 3.1 to segment the object at `point`. Returns its box (+mask) or null when SAM finds nothing. */
 export async function samTrace(
   png: Buffer,
-  box: Box,
+  point: { x: number; y: number },
   opts: { fetchImpl?: FetchLike; apiKey?: string } = {},
 ): Promise<{ box: Box; mask?: string } | null> {
   const apiKey = opts.apiKey ?? process.env.META_API_KEY;
   if (!apiKey) throw new Error("META_API_KEY is not set");
   const { w, h } = pngSize(png);
-  const prompt = `<0f>1<|box;x1=${box.x1};y1=${box.y1};x2=${box.x2};y2=${box.y2};w=${w};h=${h}|>`;
+  const prompt = `<0f>1<|point;x=${point.x};y=${point.y};w=${w};h=${h}|>`;
   const res = await (opts.fetchImpl ?? fetch)(SAM_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "User-Agent": USER_AGENT },
@@ -162,4 +173,22 @@ export async function samTrace(
   const json = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[] };
   const text = (json.output ?? []).flatMap((o) => o.content ?? []).filter((c) => c.type === "output_text").map((c) => c.text ?? "").join("");
   return parseSamBoxes(text)[0] ?? null;
+}
+
+export const center = (b: Box) => ({ x: Math.round((b.x1 + b.x2) / 2), y: Math.round((b.y1 + b.y2) / 2) });
+
+export const NO_CONFLICT_IOU = 0.7;
+
+/** The stored record: SAM (prompted only with the color box's center point) vs the color box. Never leaves a stale result. */
+export type ExhibitCheck = {
+  noConflict: boolean; iou: number; method: "point-prompt"; colorBox: Box | null; samBox: Box | null;
+  reason?: "no-color-box" | "sam-no-match"; checkedAt: number;
+};
+
+export function compareToColorBox(colorBox: Box | null, samBox: Box | null, checkedAt: number): ExhibitCheck {
+  const base = { method: "point-prompt" as const, colorBox, samBox, checkedAt };
+  if (!colorBox) return { ...base, noConflict: false, iou: 0, reason: "no-color-box" as const };
+  if (!samBox) return { ...base, noConflict: false, iou: 0, reason: "sam-no-match" as const };
+  const value = Math.round(iou(colorBox, samBox) * 1000) / 1000;
+  return { ...base, noConflict: value >= NO_CONFLICT_IOU, iou: value };
 }
