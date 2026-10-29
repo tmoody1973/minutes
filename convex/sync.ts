@@ -14,6 +14,7 @@ type Raw = Record<string, unknown>;
 const BODY_IDS = [1, 11, 272];
 // Fan-out spacing: scheduled jobs start this far apart so Legistar (a public city API) sees a trickle.
 const STAGGER_MS = 1000;
+const PARCEL_RECHECK_MS = 7 * 86_400_000;
 
 type Scope = "top" | "child";
 
@@ -65,6 +66,15 @@ export const syncEvents = internalAction({
           await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncEvent, { eventId: event.legistarId });
         });
       }
+      // A cancelled meeting disappears from Legistar's list but not from our table: mark its items removed (the
+      // normal upsert clears the mark if it comes back). Only events in this window and these bodies are considered.
+      const returned = new Set(raw.map((r) => r.EventId as number));
+      for (const eventId of await ctx.runQuery(internal.legistar.eventIdsInWindow, { since, until: end, bodyIds })) {
+        if (returned.has(eventId)) continue;
+        await c.attempt(`dropped event ${eventId}`, async () => {
+          await ctx.runMutation(internal.legistar.markEventItemsRemoved, { eventId, presentIds: [], at: Date.now() });
+        });
+      }
     });
   },
 });
@@ -113,12 +123,18 @@ export const syncMatter = internalAction({
           ? [{ name: String(a.MatterAttachmentName ?? ""), hyperlink: a.MatterAttachmentHyperlink }]
           : [],
       );
-      await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
+      const { changedFields, inserted } = await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
       // Lots named in the title. parcels is replaced only when EVERY address resolved without error; otherwise the
       // stored value stays and the failure is recorded (so the matter is not stamped fresh and is retried).
       // No addresses clears parcels. Unset = no addresses; [] = addresses exist but none resolved.
+      // Politeness: the city's MPROP and parcel services are only asked when the title changed, parcels were never
+      // looked up, or the last completed check is over 7 days old (the nightly run then refreshes weekly).
+      const checkedAt = await ctx.runQuery(internal.legistar.matterParcelsCheckedAt, { matterId });
+      const due = inserted || changedFields.includes("title") || checkedAt === null || Date.now() - checkedAt > PARCEL_RECHECK_MS;
       const addresses = extractAddresses(matter.title);
-      if (!addresses.length) {
+      if (!due) {
+        // Fresh and unchanged: keep the stored lots, make no calls.
+      } else if (!addresses.length) {
         await c.attempt("parcels", async () => {
           await ctx.runMutation(internal.legistar.setMatterParcels, { matterId });
         });

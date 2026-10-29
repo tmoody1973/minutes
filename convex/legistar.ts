@@ -130,9 +130,24 @@ export const setMatterParcels = internalMutation({
   args: { matterId: v.number(), parcels: v.optional(v.array(parcelV)) },
   handler: async (ctx, { matterId, parcels }) => {
     const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
-    if (row) await ctx.db.patch(row._id, { parcels });
+    if (row) await ctx.db.patch(row._id, { parcels, parcelsCheckedAt: Date.now() });
     await syncMatterLocation(ctx, matterId);
   },
+});
+
+export const matterParcelsCheckedAt = internalQuery({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) =>
+    (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.parcelsCheckedAt ?? null,
+});
+
+// Stored events in a sync window for the requested bodies (ids only), for spotting meetings Legistar dropped.
+export const eventIdsInWindow = internalQuery({
+  args: { since: v.string(), until: v.string(), bodyIds: v.array(v.number()) },
+  handler: async (ctx, { since, until, bodyIds }) =>
+    (await ctx.db.query("events").collect())
+      .filter((e) => bodyIds.includes(e.bodyId) && e.startsAt.slice(0, 10) >= since && e.startsAt.slice(0, 10) <= until)
+      .map((e) => e.legistarId),
 });
 
 export const getMatterParcels = internalQuery({

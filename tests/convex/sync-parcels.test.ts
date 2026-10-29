@@ -32,7 +32,8 @@ const old = { taxkey: "OLD0000000", address: "1 N OLD ST", zoning: "R1", alder: 
 async function seeded(title = SOUTH_TITLE) {
   const t = convexTest(schema, modules);
   await t.mutation(internal.legistar.upsertMatter, { legistarId: 74560, fileNumber: "260533", title, typeName: "Ordinance", statusName: "In Committee" });
-  await t.mutation(internal.legistar.setMatterParcels, { matterId: 74560, parcels: [old] });
+  // Direct patch: setMatterParcels would stamp parcelsCheckedAt, and these tests start from a never-checked matter.
+  await t.run(async (ctx) => { const m = await ctx.db.query("matters").first(); await ctx.db.patch(m!._id, { parcels: [old] }); });
   return t;
 }
 const row = (t: Awaited<ReturnType<typeof seeded>>) => t.run((ctx) => ctx.db.query("matters").first());
@@ -84,5 +85,50 @@ describe("syncMatter parcels", () => {
     expect(m?.syncedAt).toBeTypeOf("number");
     expect(await runs(t)).toEqual([]);
     expect(calls.some((u) => u.includes("data.milwaukee.gov"))).toBe(false);
+  });
+});
+
+describe("syncMatter politeness (Ruling 40)", () => {
+  const cityCalls = (calls: string[]) => calls.filter((u) => u.includes("data.milwaukee.gov") || u.includes("milwaukeemaps")).length;
+  const DAY = 86_400_000;
+  const stamp = (t: Awaited<ReturnType<typeof seeded>>, at: number) =>
+    t.run(async (ctx) => { const m = await ctx.db.query("matters").first(); await ctx.db.patch(m!._id, { parcelsCheckedAt: at }); });
+
+  it("same title and a fresh check: no MPROP or parcel-map calls, parcels kept", async () => {
+    const calls = stubFetch(SOUTH_TITLE);
+    const t = await seeded();
+    await stamp(t, Date.now() - DAY);
+    await t.action(internal.sync.syncMatter, { matterId: 74560, force: true });
+    expect(cityCalls(calls)).toBe(0);
+    expect((await row(t))?.parcels).toEqual([old]);
+    expect((await row(t))?.syncedAt).toBeTypeOf("number");
+  });
+  it("a changed title resolves again", async () => {
+    const calls = stubFetch(SOUTH_TITLE);
+    const t = await seeded("older title");
+    await stamp(t, Date.now() - DAY);
+    await t.action(internal.sync.syncMatter, { matterId: 74560, force: true });
+    expect(cityCalls(calls)).toBeGreaterThan(0);
+    expect((await row(t))?.parcels?.[0]).toMatchObject({ taxkey: "5331104000" });
+  });
+  it("never looked up (no parcelsCheckedAt) resolves, and stamps parcelsCheckedAt", async () => {
+    const calls = stubFetch(SOUTH_TITLE);
+    const t = await seeded();
+    await t.action(internal.sync.syncMatter, { matterId: 74560, force: true });
+    expect(cityCalls(calls)).toBeGreaterThan(0);
+    expect((await row(t))?.parcelsCheckedAt).toBeGreaterThan(Date.now() - 60_000);
+  });
+  it("a check older than 7 days resolves again", async () => {
+    const calls = stubFetch(SOUTH_TITLE);
+    const t = await seeded();
+    await stamp(t, Date.now() - 8 * DAY);
+    await t.action(internal.sync.syncMatter, { matterId: 74560, force: true });
+    expect(cityCalls(calls)).toBeGreaterThan(0);
+  });
+  it("a failed resolve does not stamp parcelsCheckedAt", async () => {
+    stubFetch(SOUTH_TITLE, { mprop: () => json("boom", 500) });
+    const t = await seeded();
+    await t.action(internal.sync.syncMatter, { matterId: 74560, force: true });
+    expect((await row(t))?.parcelsCheckedAt).toBeUndefined();
   });
 });

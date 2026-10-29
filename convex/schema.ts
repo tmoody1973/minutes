@@ -64,6 +64,9 @@ export default defineSchema({
     // Lots named in the title, from MPROP + the city parcel map. Unset = title has no addresses (or never looked up);
     // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
     parcels: v.optional(v.array(parcelV)),
+    // ms epoch of the last completed parcel resolve (success or all addresses skipped); unset = never looked up.
+    // Written only by setMatterParcels. syncMatter resolves again only on a title change or when this is over 7 days old.
+    parcelsCheckedAt: v.optional(v.number()),
     // Point-prompted SAM check of the exhibit map's "Subject Site" outline against the color-detected one. It records
     // whether the two conflict; it never changes what is drawn. Written only by setExhibitCheck (replaced whole each run).
     // `agrees` is the legacy field from the first (box-prompted, circular) version: kept so old rows validate, never written.

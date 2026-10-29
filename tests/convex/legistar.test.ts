@@ -202,6 +202,28 @@ describe("sync freshness", () => {
   });
 });
 
+describe("cancelled meetings (Ruling 40)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+  const returned = { EventId: 13559, EventBodyId: 272, EventBodyName: "CITY PLAN COMMISSION", EventDate: "2026-09-28T00:00:00", EventTime: "1:30 PM" };
+
+  it("marks items of stored in-window events that Legistar no longer returns, and nothing else", async () => {
+    const t = convexTest(schema, modules);
+    const mk = (legistarId: number, bodyId: number, startsAt: string) => ({ legistarId, bodyId, bodyName: "B", startsAt });
+    await t.mutation(internal.legistar.upsertEvent, mk(13559, 272, "2026-09-28T13:30:00-05:00")); // still returned
+    await t.mutation(internal.legistar.upsertEvent, mk(1, 272, "2026-09-20T13:30:00-05:00")); // in window, dropped -> removed
+    await t.mutation(internal.legistar.upsertEvent, mk(2, 5, "2026-09-20T13:30:00-05:00")); // body not requested
+    await t.mutation(internal.legistar.upsertEvent, mk(3, 272, "2026-08-01T13:30:00-05:00")); // before the window
+    for (const [id, eventId] of [[10, 13559], [11, 1], [12, 2], [13, 3]]) {
+      await t.mutation(internal.legistar.upsertEventItem, { legistarId: id, eventId, sequence: 1, matterId: 77, title: "t" });
+    }
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", async (u: string) => new Response(JSON.stringify(String(u).includes("/events?") ? [returned] : []), { status: 200 }));
+    await t.action(internal.sync.syncEvents, { since: "2026-09-01", until: "2026-10-31", bodyIds: [272] });
+    const removed = (await t.run((ctx) => ctx.db.query("eventItems").collect())).filter((i) => i.removedAt !== undefined).map((i) => i.legistarId);
+    expect(removed).toEqual([11]);
+  });
+});
+
 describe("matters.parcels", () => {
   const matter = { legistarId: 77, fileNumber: "250001", title: "T", typeName: "Ordinance", statusName: "In Committee" };
   const parcel = { taxkey: "5331104000", address: "3473 S 27TH ST", zoning: "PD", alder: 11, lotAreaSqFt: 201334.32, owner: "X", polygon: { type: "Polygon", coordinates: [] }, centroid: { lat: 1, lng: 2 } };
