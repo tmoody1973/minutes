@@ -33,7 +33,7 @@ const PATTERNS: Array<[RegExp, "for" | "against"]> = [
 const FIRST_PERSON = /\b(?:i|we|i'm|we're|i'd|we'd|i'll|we'll|my|our)\b/g;
 // Anything earlier in the clause that flips, hedges, attributes or reassigns the stance.
 const BLOCKER = new RegExp(
-  String.raw`\b(?:not|never|no longer|neither|nor|cannot|\w+n't|unsure|should|would|could|might|may|if|` +
+  String.raw`\b(?:not|never|no longer|neither|nor|hardly|barely|scarcely|cannot|\w+n't|unsure|should|would|could|might|may|if|` +
     String.raw`said|says|say|thinks|think|thought|asked|asks|told|tells|heard|hears|believes|believe|claims|claimed|` +
     String.raw`you|you're|your|he|he's|she|she's|his|her|they|they're|them|their|someone|somebody|people|everyone)\b`,
 );

@@ -28,6 +28,8 @@ const NULLS = [
   "I urge you to ask them whether they support it.",
   "Some say I should support this project.",
   "I would support this project if they changed it.",
+  "I hardly support this.",
+  "I barely support this project.",
   "You said I support this project.",
   "He thinks we oppose this.",
   "They asked if I support this.",
