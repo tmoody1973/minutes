@@ -23,6 +23,13 @@ function renderMapPng(url: string, fileNumber: string): Promise<Buffer> {
 }
 
 async function main() {
+  // Retired: the SAM cross-check was cut (docs/decisions/002-parcel-outline-from-city-records-sam-as-check.md).
+  // Exit before any network call or database write; the code below is kept only as a record of what was tried.
+  const retired = true as boolean; // widened so the kept code below still type-checks
+  if (retired) {
+    console.error("sam-check is retired: see docs/decisions/002-parcel-outline-from-city-records-sam-as-check.md (SAM check cut). Nothing was run.");
+    process.exit(2);
+  }
   for (const fileNumber of process.argv.slice(2)) {
     const matter = convexRun<{ attachments?: { name: string; hyperlink: string }[] } | null>("legistar:getMatterByFileNumber", { fileNumber });
     const map = matter?.attachments?.find((a) => a.name.trim().toLowerCase() === "map");

@@ -62,8 +62,8 @@ const dist = (a: Rgb, b: Rgb) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2
  * Bounding box of the "Subject Site" dashed outline on a city exhibit map.
  * ponytail: assumes the exhibit layout (map left, legend panel in the right ~36%, "Subject Site" the first legend swatch
  * near the top). Learns the swatch color from that corner, then boxes matching pixels left of it. A different layout
- * returns null when nothing plausible is found. A wrong-but-plausible color box is NOT caught by the SAM check (SAM is
- * prompted from this box's center), so the sanity bounds below are the only guard.
+ * returns null when nothing plausible is found. A wrong-but-plausible color box is not caught here, so the sanity bounds below
+ * are the only guard (the SAM cross-check was cut: docs/decisions/002).
  */
 export function findSubjectSiteBox(png: Buffer): Box | null {
   return findSubjectSite(png)?.box ?? null;
@@ -193,11 +193,10 @@ export async function samTrace(
   return parseSamBoxes(text)[0] ?? null;
 }
 
-export const center = (b: Box) => ({ x: Math.round((b.x1 + b.x2) / 2), y: Math.round((b.y1 + b.y2) / 2) });
 
 export const NO_CONFLICT_IOU = 0.7;
 
-/** The stored record: SAM (prompted only with the color box's center point) vs the color box. Never leaves a stale result. */
+/** The stored record: SAM (prompted with one point on the color-detected outline) vs the color box. Never leaves a stale result. */
 export type ExhibitCheck = {
   noConflict: boolean; iou: number; method: "outline-point"; colorBox: Box | null; samBox: Box | null;
   reason?: "no-color-box" | "sam-no-match"; checkedAt: number;

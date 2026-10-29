@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { center, compareToColorBox, findSubjectSite, findSubjectSiteBox, iou, parseSamBoxes, samTrace } from "../../lib/geo/subjectSite";
+import { compareToColorBox, findSubjectSite, findSubjectSiteBox, iou, parseSamBoxes, samTrace } from "../../lib/geo/subjectSite";
 
 const png = readFileSync("tests/fixtures/exhibits/260532_map-1.png");
 // Tiny PNG writer for synthetic cases (CRCs are zeros; our decoder does not check them).
@@ -85,7 +85,6 @@ describe("PNG decoder guards", () => {
 
 describe("compareToColorBox", () => {
   const cb = { x1: 100, y1: 100, x2: 200, y2: 200 };
-  it("center of a box", () => expect(center(cb)).toEqual({ x: 150, y: 150 }));
   it("IoU >= 0.7 is noConflict, below is not (threshold)", () => {
     expect(compareToColorBox(cb, { x1: 100, y1: 100, x2: 200, y2: 170 }, 5).noConflict).toBe(true); // 0.70
     expect(compareToColorBox(cb, { x1: 100, y1: 100, x2: 200, y2: 169 }, 5).noConflict).toBe(false); // 0.69
