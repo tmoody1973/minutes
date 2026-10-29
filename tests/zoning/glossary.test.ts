@@ -1,17 +1,30 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEMO_CODES, GLOSSARY, NOT_FOUND, displayable, type GlossaryEntry } from "@/lib/zoning/glossary";
+import { DEMO_CODES, NOT_FOUND, displayable, entriesForTest, lookup, type GlossaryEntry } from "@/lib/zoning/glossary";
 
 const FIX = join(__dirname, "../fixtures");
-// Collapse whitespace; a hyphen at a line wrap is a compound hyphen in this code ("RS1-\nRS5"), so rejoin it.
-const norm = (s: string) => s.replace(/-\s+/g, "-").replace(/\s+/g, " ").trim();
-const excerptFor = (e: GlossaryEntry) => {
+// Collapse whitespace. Only a hyphen at a line END is rejoined (a compound hyphen wrapped, "RS1-\nRS5");
+// a mid-line "mid- to" is left alone.
+const norm = (s: string) => s.replace(/-[ \t]*\n\s*/g, "-").replace(/\s+/g, " ").trim();
+const rawFixture = (e: GlossaryEntry) => {
   const m = /CH295-sub(\d+)\.pdf/.exec(e.officialUrl);
   expect(m, `${e.term}: officialUrl must be a CH295-subN.pdf`).not.toBeNull();
-  return norm(readFileSync(join(FIX, "zoning-code", `CH295-sub${m![1]}.txt`), "utf8"));
+  return readFileSync(join(FIX, "zoning-code", `CH295-sub${m![1]}.txt`), "utf8");
 };
-const entries = Object.entries(GLOSSARY);
+const excerptFor = (e: GlossaryEntry) => norm(rawFixture(e));
+// Fixture blocks start with "# <term> (<section>)"; return the text under the heading for this entry.
+const blockFor = (e: GlossaryEntry) => {
+  const raw = rawFixture(e);
+  const head = `# ${e.term} (${e.section})`;
+  const i = raw.split("\n").findIndex((l) => l === head);
+  if (i < 0) return null;
+  const rest = raw.split("\n").slice(i + 1);
+  const end = rest.findIndex((l) => l.startsWith("# "));
+  return norm((end < 0 ? rest : rest.slice(0, end)).join("\n"));
+};
+const entries = entriesForTest().map(([k, e]) => [k, e] as const);
+const GLOSSARY = Object.fromEntries(entries);
 
 describe("zoning glossary", () => {
   it("has the required terms", () => {
@@ -25,6 +38,13 @@ describe("zoning glossary", () => {
     expect(e.section.trim()).not.toBe("");
     expect(e.officialText.trim()).not.toBe("");
     expect(excerptFor(e)).toContain(norm(e.officialText));
+  });
+
+  it.each(entries)("%s: section heading in fixture contains the official text", (_k, e) => {
+    expect(e.section).toMatch(/^295-\d+/);
+    const block = blockFor(e);
+    expect(block, `${e.term}: no "# ${e.term} (${e.section})" heading in fixture`).not.toBeNull();
+    expect(block!).toContain(norm(e.officialText));
   });
 
   it.each(entries)("%s: plain draft is short, unapproved by default", (_k, e) => {
@@ -53,6 +73,24 @@ describe("zoning glossary", () => {
       expect(GLOSSARY[n.term]).toBeUndefined();
     }
     expect(NOT_FOUND.some((n) => n.term === "conditional use")).toBe(true);
+  });
+});
+
+describe("lookup", () => {
+  it("never returns an unapproved plain line", () => {
+    for (const [k] of entries) {
+      const r = lookup(k);
+      expect(r, k).not.toBeNull();
+      expect(r!.plain).toBeNull();
+      expect(r!.officialText.length).toBeGreaterThan(0);
+    }
+  });
+  it("returns null for unknown keys and prototype names", () => {
+    expect(lookup("nope")).toBeNull();
+    expect(lookup("constructor")).toBeNull();
+  });
+  it("undefined-suffix codes say the code does not define it", () => {
+    for (const k of ["C9A(A)", "C9F(A)"]) expect(GLOSSARY[k].plain).toContain("chapter 295 does not define it");
   });
 });
 

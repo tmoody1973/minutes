@@ -1,10 +1,11 @@
 // Plain-English glossary for the project page's "What would change" section.
 //
-// Rules (Ruling 36): `officialText` is copied VERBATIM from the Milwaukee Code of Ordinances, ch. 295 (Zoning),
+// Rules (Rulings 36, 37): `officialText` is copied VERBATIM from the Milwaukee Code of Ordinances, ch. 295 (Zoning),
 // published by the City Clerk at city.milwaukee.gov; `officialUrl` is that PDF (with #page=N) and `section` the
-// code section. `plain` is a draft one-liner that the builder must approve (`approved: true`) before the UI shows it.
-// Never write an official definition from memory: if it cannot be found, list it in NOT_FOUND instead.
-// Excerpts are saved in tests/fixtures/zoning-code/ and a test checks each officialText against them.
+// code section. `plain` is a draft that may only restate its own `officialText`, and the builder must approve it
+// (`approved: true`) before the UI shows it. Never write an official definition from memory: if it cannot be found,
+// list it in NOT_FOUND instead. Excerpts are saved in tests/fixtures/zoning-code/ and tests check each officialText.
+// The UI reads entries only through `lookup`, which cannot return an unapproved plain line.
 
 export interface GlossaryEntry {
   term: string;
@@ -16,11 +17,11 @@ export interface GlossaryEntry {
   section: string;
 }
 
-export const GLOSSARY: Record<string, GlossaryEntry> = {
+const GLOSSARY: Record<string, GlossaryEntry> = {
   "PD": {
     term: "Planned Development",
     code: "PD",
-    plain: "A Planned Development is a zoning district that lets a project follow its own approved plan instead of the standard rules for the area.",
+    plain: "A Planned Development is a district intended to allow flexibility in land development, promote creativity and variety, and encourage development compatible with its surroundings.",
     approved: false,
     officialText: "The planned development district is intended to: a. Allow flexibility in land development. b. Promote creativity, variety and environmental sensitivity. c. Encourage development compatible with its surroundings and consistent with the city's comprehensive plan.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf#page=19",
@@ -29,16 +30,16 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "GPD": {
     term: "General Planned Development",
     code: "GPD",
-    plain: "A General Planned Development is the overall plan for a large site that will be built in stages, with each stage getting its own detailed plan.",
+    plain: "A general plan covers the entire tract when development will proceed in stages over an extended period; separate detailed plans for each stage then follow the general plan.",
     approved: false,
-    officialText: "If actual development of the project is to proceed in stages over an extended period of time, the applicant shall first submit a general plan covering the entire tract. Separate detailed plans shall then be submitted for each stage of development and shall follow the development concept established by the general plan.",
+    officialText: "If actual development of the project is to proceed in stages over an extended period of time, the applicant shall first submit a general plan covering the entire tract. Separate detailed plans shall then be submitted for each stage of development and shall follow the development concept established by the general plan. If development of the project is not to be done in stages, a general plan is optional and a single detailed plan may be submitted in lieu thereof.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf#page=19",
     section: "295-907-2-a",
   },
   "DPD": {
     term: "Detailed Planned Development",
     code: "DPD",
-    plain: "A Detailed Planned Development sets the specific plan for a site; building permits cannot be issued until the Common Council approves that plan.",
+    plain: "No building permits are issued and no site work starts in a planned development district until Common Council approves a detailed plan and the city clerk certifies the ordinance.",
     approved: false,
     officialText: "Within any planned development district, no building permits may be issued and no site work may be commenced until a detailed plan has been approved by the common council and a copy of the ordinance has been certified by the city clerk.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf#page=21",
@@ -46,7 +47,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   "minor modification": {
     term: "Minor modification (to a Detailed Planned Development)",
-    plain: "A minor modification is a small change to an approved Detailed Planned Development that the Common Council can approve by resolution, without a full amendment.",
+    plain: "The Common Council may approve by resolution modifications to approved detailed plans if it finds they do not change the general character or cause the other listed changes.",
     approved: false,
     officialText: "Minor Modifications. The common council may by resolution approve modifications to approved detailed plans which are consistent with the spirit and intent of the general planned development or a previously approved detailed planned development provided the common council finds that the modification will not: i-1. Change the general character of the planned development. i-2. Cause a substantial relocation of principal or accessory structures. i-3. Cause a substantial relocation or reduction of parking, loading or recreation areas. i-4. Cause a substantial relocation of traffic facilities. i-5. Increase the land coverage of buildings and parking areas. i-6. Increase the gross floor area of buildings or the number of dwelling units. i-7. Reduce the amount of approved open space, landscaping or screening.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf#page=21",
@@ -54,7 +55,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   "special use": {
     term: "Special use",
-    plain: "A special use is a use that may be allowed in a district, but only after the Board of Zoning Appeals reviews that specific proposal.",
+    plain: "A special use is generally acceptable in a district but needs case-by-case review to decide whether it is permitted, conditionally permitted or denied.",
     approved: false,
     officialText: "SPECIAL USE means a use which is generally acceptable in a particular zoning district but which, because of its characteristics and the characteristics of the zoning district in which it would be located, requires review on a case-by-case basis to determine whether it should be permitted, conditionally permitted or denied.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub2.pdf#page=21",
@@ -62,7 +63,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   "variance, dimensional": {
     term: "Variance (dimensional)",
-    plain: "A dimensional variance is permission from the Board of Zoning Appeals to depart from a size or placement rule, such as height or setback.",
+    plain: "A dimensional variance is permission from the board to depart from requirements other than use regulations, such as area, setback, frontage, height, bulk, density or design.",
     approved: false,
     officialText: "VARIANCE, DIMENSIONAL means permission from the board to depart from any of the literal requirements of this chapter except use regulations, including but not limited to a departure from an area, setback, frontage, height, bulk, density or design requirement.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub2.pdf#page=24",
@@ -70,7 +71,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   "variance, use": {
     term: "Variance (use)",
-    plain: "A use variance is permission from the Board of Zoning Appeals to use a property in a way the district's use rules do not allow.",
+    plain: "A use variance is permission from the board to depart from any of the use regulations of the chapter.",
     approved: false,
     officialText: "VARIANCE, USE means permission from the board to depart from any of the use regulations of this chapter.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub2.pdf#page=24",
@@ -106,7 +107,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "RM3": {
     term: "Multi-Family Residential (RM3)",
     code: "RM3",
-    plain: "RM3 is a multi-family residential district meant mainly for medium-density housing.",
+    plain: "RM3 is a district meant mainly for medium-density residential uses with an urban character.",
     approved: false,
     officialText: "RM3 District. The purpose of the RM3 district is to promote, preserve, and protect neighborhoods intended primarily for medium-density residential uses with an urban character. This district, much like the RM4-RM7 districts, allows smaller lots, smaller setbacks and higher lot coverage than the RM1-RM2 districts. However, the neighborhoods in this district were platted and developed, in large part, in the early 1900s and tend to be more uniform and of a lower density than those of the RM4-RM7 districts. This district also allows traditional corner commercial establishments commonly found in urban neighborhoods.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub5.pdf#page=2",
@@ -115,7 +116,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "RM6": {
     term: "Multi-Family Residential (RM4-RM7)",
     code: "RM6",
-    plain: "RM6 is one of the high-density multi-family residential districts.",
+    plain: "RM6 is one of the RM4-RM7 districts, meant mainly for high-density multi-family residential uses.",
     approved: false,
     officialText: "RM4-RM7 Districts. The purpose of the RM4-RM7 districts is to promote, preserve and protect neighborhoods intended primarily for high-density multi-family residential uses. These districts allow a wide range of lot sizes, smaller setbacks, and a high percentage of lot coverage. They also allow neighborhood-serving commercial establishments commonly found in urban neighborhoods.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub5.pdf#page=2",
@@ -124,7 +125,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "NS2": {
     term: "Neighborhood Shopping (NS2)",
     code: "NS2",
-    plain: "NS2 is a district for neighborhood-scale shops and services alongside homes, in a more urban pattern than NS1.",
+    plain: "NS2 is a neighborhood shopping district: residential uses plus commercial uses serving the neighborhood, in a more urban pattern with smaller lots and smaller setbacks.",
     approved: false,
     officialText: "NEIGHBORHOOD SHOPPING DISTRICTS (NS1-NS2). These districts provide for residential uses as well as commercial uses that serve the neighborhood. Such commercial uses are necessary to satisfy basic shopping and service needs that occur frequently and must, therefore, be located close to residential areas. The character of these districts is intended to be compatible with that of surrounding residential neighborhoods. Buildings in these districts are typically smaller in scale than those found in local business districts. The NS1 district is characterized by a more suburban development pattern, with larger lots and deeper setbacks, while the development pattern in the NS2 district tends to be more urban, with smaller lots and smaller setbacks.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub6.pdf#page=1",
@@ -133,7 +134,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "LB1": {
     term: "Local Business (LB1)",
     code: "LB1",
-    plain: "LB1 is a local business district for stores and services that draw customers from a wide area, in a more suburban pattern.",
+    plain: "LB1 is a local business district providing a wide range of goods and services, in a more suburban pattern with larger lots and deeper setbacks.",
     approved: false,
     officialText: "LOCAL BUSINESS DISTRICTS (LB1-LB3). These districts provide a wide range of goods and services to a large consumer population coming from an extensive area. Within these districts, motor-vehicle-related activities are of major significance. Good access by motor vehicle or public transit is important to local business districts, which are often located adjacent to intersections of major thoroughfares and in close proximity to bus transfer locations. The LB1 district is characterized by a more suburban development pattern, with larger lots and deeper setbacks, while the development pattern in the LB2 district tends to be more urban, with smaller lots and smaller setbacks. The LB3 district is the most urban and is characterized by design standards appropriate for neighborhood commercial hubs, centers, corridors and transit-oriented development areas that have a denser level of development and may have taller buildings, all of which promote compact, walkable, sustainable neighborhoods.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub6.pdf#page=1",
@@ -142,7 +143,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "LB2": {
     term: "Local Business (LB2)",
     code: "LB2",
-    plain: "LB2 is a local business district for stores and services that draw customers from a wide area, in a more urban pattern.",
+    plain: "LB2 is a local business district providing a wide range of goods and services, in a more urban pattern with smaller lots and smaller setbacks.",
     approved: false,
     officialText: "LOCAL BUSINESS DISTRICTS (LB1-LB3). These districts provide a wide range of goods and services to a large consumer population coming from an extensive area. Within these districts, motor-vehicle-related activities are of major significance. Good access by motor vehicle or public transit is important to local business districts, which are often located adjacent to intersections of major thoroughfares and in close proximity to bus transfer locations. The LB1 district is characterized by a more suburban development pattern, with larger lots and deeper setbacks, while the development pattern in the LB2 district tends to be more urban, with smaller lots and smaller setbacks. The LB3 district is the most urban and is characterized by design standards appropriate for neighborhood commercial hubs, centers, corridors and transit-oriented development areas that have a denser level of development and may have taller buildings, all of which promote compact, walkable, sustainable neighborhoods.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub6.pdf#page=1",
@@ -151,7 +152,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "IO1": {
     term: "Industrial-Office (IO1)",
     code: "IO1",
-    plain: "IO1 is an industrial-office district, typically office-industrial or business parks with campus-style layouts.",
+    plain: "IO1 is the newer part of the industrial-office district, in the form of office-industrial parks or business parks with campus-style layouts.",
     approved: false,
     officialText: "INDUSTRIAL-OFFICE (IO). This district provides sites for modern, clean industry and supporting, non-residential land uses that complement industrial uses or require an industrial environment. Older portions of this zoning district (IO2) often form corridors which provide a buffer between residential areas and more intensive industrial districts. The newer portions of this district (IO1) are in the form of office-industrial parks or business parks with campus-style layouts and designs. The IO district has a performance-oriented transition area where it adjoins residential neighborhoods. Buffering and other requirements in the transition area are intended to protect the character of such neighborhoods.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf#page=1",
@@ -160,7 +161,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "IL1": {
     term: "Industrial-Light (IL1)",
     code: "IL1",
-    plain: "IL1 is a light industrial district, typically modern industrial parks.",
+    plain: "IL1 is the part of the industrial-light district made up of modern industrial parks.",
     approved: false,
     officialText: "INDUSTRIAL-LIGHT (IL). This district is intended to provide sites primarily for light industrial uses that utilize medium-sized buildings and do not have extensive outdoor storage areas or operations. This district includes both older industrial corridors (IL2) and modern industrial parks (IL1). While most buildings contain clean, light industrial uses, some commercial and office uses may also be included. This district contains heavier uses than the IO district and requires more extensive buffering from adjoining residential areas.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf#page=1",
@@ -169,7 +170,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "IM": {
     term: "Industrial-Mixed (IM)",
     code: "IM",
-    plain: "IM is a district for converting older industrial and warehouse areas to residential, commercial or office use.",
+    plain: "IM is a district intended for the orderly conversion of older industrial and warehousing areas to residential, commercial or office uses.",
     approved: false,
     officialText: "INDUSTRIAL-MIXED (IM). This district is intended to provide for the orderly conversion of certain older industrial and warehousing areas with multi-story buildings to residential, commercial or office uses for which the buildings, at the present time, may be better suited. These areas have an urban character. Buildings were typically built without setbacks or yards and often with little or no off-street parking.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf#page=1",
@@ -178,7 +179,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "IH": {
     term: "Industrial-Heavy (IH)",
     code: "IH",
-    plain: "IH is the heavy industrial district, for high-intensity industry and large or isolated sites.",
+    plain: "IH is the industrial-heavy district, which accommodates high-intensity industry and uses that need large or isolated sites.",
     approved: false,
     officialText: "INDUSTRIAL-HEAVY (IH). This district accommodates high-intensity industry and often includes very large structures, extensive exterior storage, exterior mechanical operations, or heavy truck or equipment operations. It also accommodates uses that require large or isolated sites or harbor, airport or rail service. This district includes the historic industrial core of the city. It has a strong relationship to shipping and rail services and includes the port of Milwaukee, the Menomonee valley and various railroad corridors. Most sites within the IH district have already been developed or redeveloped. These sites seldom have excess land to provide buffer areas. Where possible, the IH district should be separated from residential neighborhoods with less intensive, non-residential districts.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf#page=1",
@@ -187,7 +188,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "C9A(A)": {
     term: "High-Density Residential (C9A)",
     code: "C9A(A)",
-    plain: "C9A is a downtown high-density residential district; the (A) in the parcel record is a subdistrict label.",
+    plain: "C9A is the high-density residential district, a highly urban living environment. (A) appears in the parcel record; chapter 295 does not define it.",
     approved: false,
     officialText: "HIGH-DENSITY RESIDENTIAL (C9A). The high-density residential district is designed and intended to serve as a highly urban living environment for those persons or families desirous of a residential location in close proximity to the city's downtown, as delineated in the city’s comprehensive plan.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub7.pdf#page=1",
@@ -196,7 +197,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   "C9F(A)": {
     term: "Office and Service (C9F)",
     code: "C9F(A)",
-    plain: "C9F is a downtown office and service district; the (A) in the parcel record is a subdistrict label.",
+    plain: "C9F is the office and service district, a retail and services district and major office center. (A) appears in the parcel record; chapter 295 does not define it.",
     approved: false,
     officialText: "OFFICE AND SERVICE (C9F). The office and service district is designed and intended to serve both as a retail trade and a personal and business services district, as well as a major center of office commercial activities.",
     officialUrl: "https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub7.pdf#page=1",
@@ -219,4 +220,25 @@ export const DEMO_CODES: ReadonlyArray<string> = ["PD", "GPD", "DPD", "RS2", "RT
 /** The only way the UI should read `plain`: unapproved or missing entries yield null. */
 export function displayable(entry: GlossaryEntry | undefined): string | null {
   return entry?.approved ? entry.plain : null;
+}
+
+export interface GlossaryLookup {
+  term: string;
+  code?: string;
+  plain: string | null;
+  officialText: string;
+  officialUrl: string;
+  section: string;
+}
+
+/** Look up a district code ("RT4") or term key ("special use"). `plain` is null until the builder approves it. */
+export function lookup(codeOrTerm: string): GlossaryLookup | null {
+  const e = Object.hasOwn(GLOSSARY, codeOrTerm) ? GLOSSARY[codeOrTerm] : undefined;
+  if (!e) return null;
+  return { term: e.term, code: e.code, plain: displayable(e), officialText: e.officialText, officialUrl: e.officialUrl, section: e.section };
+}
+
+/** Test-only: raw entries (including unapproved plain drafts). Do not import from UI code. */
+export function entriesForTest(): ReadonlyArray<[string, GlossaryEntry]> {
+  return Object.entries(GLOSSARY);
 }
