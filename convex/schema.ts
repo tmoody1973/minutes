@@ -71,7 +71,7 @@ export default defineSchema({
       agrees: v.optional(v.boolean()),
       noConflict: v.optional(v.boolean()),
       iou: v.number(),
-      method: v.optional(v.literal("point-prompt")),
+      method: v.optional(v.union(v.literal("point-prompt"), v.literal("outline-point"))),
       colorBox: v.optional(v.union(boxV, v.null())),
       samBox: v.optional(v.union(boxV, v.null())),
       reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),

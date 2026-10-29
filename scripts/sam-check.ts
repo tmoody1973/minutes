@@ -1,12 +1,12 @@
 // Usage: npx tsx scripts/sam-check.ts <fileNumber> [...]   (DEV deployment only; one SAM call per file; needs pdftoppm + META_API_KEY)
-// Finds the exhibit map's "Subject Site" outline by color, prompts SAM 3.1 with only that box's center point, and stores
+// Finds the exhibit map's "Subject Site" outline by color, prompts SAM 3.1 with one point on that outline, and stores
 // matters.exhibitCheck (noConflict = IoU >= 0.7). It records the result only; it never changes the lot drawn from city records.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { convexRun } from "./convex-run";
-import { center, compareToColorBox, findSubjectSiteBox, samTrace } from "../lib/geo/subjectSite";
+import { compareToColorBox, findSubjectSite, samTrace } from "../lib/geo/subjectSite";
 
 const UA = "Minutes/0.1 (tarik@radiomilwaukee.org)";
 
@@ -29,8 +29,9 @@ async function main() {
     if (!map) { console.log(`${fileNumber}: no "Map" attachment, skipped`); continue; }
 
     const png = await renderMapPng(map.hyperlink, fileNumber);
-    const colorBox = findSubjectSiteBox(png);
-    const sam = colorBox ? await samTrace(png, center(colorBox)) : null;
+    const site = findSubjectSite(png);
+    const colorBox = site?.box ?? null;
+    const sam = site ? await samTrace(png, site.point) : null;
     const record = compareToColorBox(colorBox, sam?.box ?? null, Date.now());
     convexRun("legistar:setExhibitCheck", { fileNumber, ...record });
     console.log(`${fileNumber}: colorBox`, colorBox, "samBox", sam?.box ?? null, "iou", record.iou, "noConflict", record.noConflict, record.reason ?? "");

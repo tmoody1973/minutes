@@ -66,6 +66,11 @@ const dist = (a: Rgb, b: Rgb) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2
  * prompted from this box's center), so the sanity bounds below are the only guard.
  */
 export function findSubjectSiteBox(png: Buffer): Box | null {
+  return findSubjectSite(png)?.box ?? null;
+}
+
+/** Same detection, plus an outline-colored pixel from the winning group nearest the midpoint of the box's top edge. */
+export function findSubjectSite(png: Buffer): { box: Box; point: { x: number; y: number } } | null {
   const img = decodePng(png);
   if (!img) return null;
   const at = (x: number, y: number): Rgb => { const i = (y * img.w + x) * img.ch; return [img.px[i], img.px[i + 1], img.px[i + 2]]; };
@@ -92,14 +97,17 @@ export function findSubjectSiteBox(png: Buffer): Box | null {
     }
   const seen = new Set<number>();
   let best: { n: number; x1: number; y1: number; x2: number; y2: number } | null = null;
+  let bestKeys: number[] = [];
   for (const start of cells.keys()) {
     if (seen.has(start)) continue;
     const group = { n: 0, x1: Infinity, y1: Infinity, x2: -1, y2: -1 };
     const stack = [start];
+    const keys: number[] = [];
     seen.add(start);
     while (stack.length) {
       const k = stack.pop()!;
       const c = cells.get(k)!;
+      keys.push(k);
       group.n += c.n; group.x1 = Math.min(group.x1, c.x1); group.y1 = Math.min(group.y1, c.y1);
       group.x2 = Math.max(group.x2, c.x2); group.y2 = Math.max(group.y2, c.y2);
       for (const dy of [-1, 0, 1]) for (const dx of [-1, 0, 1]) {
@@ -109,11 +117,21 @@ export function findSubjectSiteBox(png: Buffer): Box | null {
         seen.add(nk); stack.push(nk);
       }
     }
-    if (!best || group.n > best.n) best = group;
+    if (!best || group.n > best.n) { best = group; bestKeys = keys; }
   }
   if (!best || best.n < 50) return null;
   const box = { x1: best.x1, y1: best.y1, x2: best.x2, y2: best.y2 };
-  return plausible(box, img.w, img.h) ? box : null;
+  if (!plausible(box, img.w, img.h)) return null;
+  const inGroup = new Set(bestKeys);
+  const midX = (box.x1 + box.x2) / 2;
+  let point = { x: -1, y: -1 }, bestD = Infinity;
+  for (let y = box.y1; y <= box.y2; y++)
+    for (let x = box.x1; x <= box.x2; x++) {
+      if (!inGroup.has(Math.floor(y / CELL) * cols + Math.floor(x / CELL)) || dist(at(x, y), swatch) > SWATCH_TOLERANCE) continue;
+      const d = Math.hypot(x - midX, y - box.y1);
+      if (d < bestD) { bestD = d; point = { x, y }; }
+    }
+  return { box, point };
 }
 
 // A real subject-site outline is a lot-sized, roughly compact shape that sits inside the map frame.
@@ -181,12 +199,12 @@ export const NO_CONFLICT_IOU = 0.7;
 
 /** The stored record: SAM (prompted only with the color box's center point) vs the color box. Never leaves a stale result. */
 export type ExhibitCheck = {
-  noConflict: boolean; iou: number; method: "point-prompt"; colorBox: Box | null; samBox: Box | null;
+  noConflict: boolean; iou: number; method: "outline-point"; colorBox: Box | null; samBox: Box | null;
   reason?: "no-color-box" | "sam-no-match"; checkedAt: number;
 };
 
 export function compareToColorBox(colorBox: Box | null, samBox: Box | null, checkedAt: number): ExhibitCheck {
-  const base = { method: "point-prompt" as const, colorBox, samBox, checkedAt };
+  const base = { method: "outline-point" as const, colorBox, samBox, checkedAt };
   if (!colorBox) return { ...base, noConflict: false, iou: 0, reason: "no-color-box" as const };
   if (!samBox) return { ...base, noConflict: false, iou: 0, reason: "sam-no-match" as const };
   const value = Math.round(iou(colorBox, samBox) * 1000) / 1000;

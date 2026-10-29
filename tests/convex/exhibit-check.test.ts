@@ -11,7 +11,7 @@ describe("exhibitCheck", () => {
   it("setExhibitCheck stores the full record (replacing any older one), getMatterByFileNumber finds the row, and a later matter upsert leaves it alone", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.legistar.upsertMatter, matter);
-    const check = { noConflict: true, iou: 0.91, method: "point-prompt" as const, colorBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, samBox: null, reason: "sam-no-match" as const, checkedAt: 1000 };
+    const check = { noConflict: true, iou: 0.91, method: "outline-point" as const, colorBox: { x1: 1, y1: 2, x2: 3, y2: 4 }, samBox: null, reason: "sam-no-match" as const, checkedAt: 1000 };
     await t.mutation(internal.legistar.setExhibitCheck, { fileNumber: "260532", ...check });
     await t.mutation(internal.legistar.upsertMatter, { ...matter, title: "t2" });
     const row = await t.query(internal.legistar.getMatterByFileNumber, { fileNumber: "260532" });

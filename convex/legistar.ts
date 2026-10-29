@@ -151,7 +151,7 @@ export const setExhibitCheck = internalMutation({
     fileNumber: v.string(),
     noConflict: v.boolean(),
     iou: v.number(),
-    method: v.literal("point-prompt"),
+    method: v.literal("outline-point"),
     colorBox: v.union(boxV, v.null()),
     samBox: v.union(boxV, v.null()),
     reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),

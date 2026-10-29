@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { center, compareToColorBox, findSubjectSiteBox, iou, parseSamBoxes, samTrace } from "../../lib/geo/subjectSite";
+import { center, compareToColorBox, findSubjectSite, findSubjectSiteBox, iou, parseSamBoxes, samTrace } from "../../lib/geo/subjectSite";
 
 const png = readFileSync("tests/fixtures/exhibits/260532_map-1.png");
 // Tiny PNG writer for synthetic cases (CRCs are zeros; our decoder does not check them).
@@ -54,6 +54,27 @@ describe("findSubjectSiteBox sanity bounds", () => {
   it("rejects a box touching the image edge", () => expect(findSubjectSiteBox(withBlock(0, 50, 59, 109))).toBeNull());
 });
 
+describe("findSubjectSite outline point", () => {
+  it("returns a pixel ON the hollow outline (not the empty center), nearest the top-edge midpoint", () => {
+    const ring = makePng(400, 300, { paint: (x, y) => {
+      const swatch = x >= 300 && x < 320 && y >= 20 && y < 30;
+      const inBox = x >= 50 && x <= 109 && y >= 50 && y <= 109;
+      const onRing = inBox && (x <= 52 || x >= 107 || y <= 52 || y >= 107);
+      return swatch || onRing ? BLUE : [255, 255, 255];
+    } });
+    const r = findSubjectSite(ring)!;
+    expect(r.box).toEqual({ x1: 50, y1: 50, x2: 109, y2: 109 });
+    expect(r.point.y).toBeLessThanOrEqual(52);
+    expect(Math.abs(r.point.x - 80)).toBeLessThanOrEqual(1);
+  });
+  it("on the Southgate fixture the point lies inside the color box near its top edge", () => {
+    const r = findSubjectSite(png)!;
+    expect(r.point.x).toBeGreaterThanOrEqual(r.box.x1);
+    expect(r.point.x).toBeLessThanOrEqual(r.box.x2);
+    expect(r.point.y - r.box.y1).toBeLessThan(15);
+  });
+});
+
 describe("PNG decoder guards", () => {
   const ok = (o: Parameters<typeof makePng>[2]) => expect(findSubjectSiteBox(makePng(8, 8, o))).toBeNull();
   it("palette PNG -> null", () => ok({ color: 3 }));
@@ -70,9 +91,9 @@ describe("compareToColorBox", () => {
     expect(compareToColorBox(cb, { x1: 100, y1: 100, x2: 200, y2: 169 }, 5).noConflict).toBe(false); // 0.69
   });
   it("no color box -> noConflict false, reason no-color-box", () =>
-    expect(compareToColorBox(null, null, 5)).toEqual({ noConflict: false, iou: 0, method: "point-prompt", colorBox: null, samBox: null, reason: "no-color-box", checkedAt: 5 }));
+    expect(compareToColorBox(null, null, 5)).toEqual({ noConflict: false, iou: 0, method: "outline-point", colorBox: null, samBox: null, reason: "no-color-box", checkedAt: 5 }));
   it("no SAM match -> noConflict false, reason sam-no-match", () =>
-    expect(compareToColorBox(cb, null, 5)).toEqual({ noConflict: false, iou: 0, method: "point-prompt", colorBox: cb, samBox: null, reason: "sam-no-match", checkedAt: 5 }));
+    expect(compareToColorBox(cb, null, 5)).toEqual({ noConflict: false, iou: 0, method: "outline-point", colorBox: cb, samBox: null, reason: "sam-no-match", checkedAt: 5 }));
 });
 
 describe("SAM response parsing", () => {
