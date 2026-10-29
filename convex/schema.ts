@@ -40,6 +40,8 @@ export default defineSchema({
     typeName: v.string(),
     statusName: v.string(),
     introDate: v.optional(v.string()),
+    // Exhibit list (name + hyperlink) from matters/{id}/attachments; Milestone 2 reads exhibit maps from it.
+    attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
   }).index("by_legistarId", ["legistarId"]),
   histories: defineTable({
     legistarId: v.number(),

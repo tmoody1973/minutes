@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
 import type * as legistar from "../legistar.js";
+import type * as sync from "../sync.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
   legistar: typeof legistar;
+  sync: typeof sync;
 }>;
 
 /**

@@ -1,0 +1,130 @@
+import { v } from "convex/values";
+import { api, internal } from "./_generated/api";
+import { internalAction, type ActionCtx } from "./_generated/server";
+import { legistarGet } from "../lib/legistar/client";
+import { parseEvent, parseEventItem, parseHistory, parseMatter, parseVote } from "../lib/legistar/parse";
+import { computeTally } from "../lib/legistar/tally";
+import { eventsFilter, hasVotes, matterIdsOf, memberFilter } from "../lib/legistar/plan";
+
+type Raw = Record<string, unknown>;
+
+// Council 1, Zoning/Neighborhoods/Development 11, City Plan Commission 272.
+const BODY_IDS = [1, 11, 272];
+// Fan-out spacing: scheduled jobs start this far apart so Legistar (a public city API) sees a trickle.
+const STAGGER_MS = 1000;
+
+// Record one syncRuns row per run; failures are logged, never delete data.
+async function recorded(ctx: ActionCtx, label: string, work: () => Promise<void>) {
+  const startedAt = Date.now();
+  try {
+    await work();
+    await ctx.runMutation(api.legistar.recordSyncRun, { startedAt, finishedAt: Date.now(), ok: true });
+  } catch (err) {
+    const error = `${label}: ${err instanceof Error ? err.message : String(err)}`;
+    console.error(error);
+    await ctx.runMutation(api.legistar.recordSyncRun, { startedAt, finishedAt: Date.now(), ok: false, error });
+  }
+}
+
+// Lists events in the window, upserts them, and fans out one syncEvent per event.
+export const syncEvents = internalAction({
+  args: { since: v.string(), until: v.optional(v.string()), bodyIds: v.array(v.number()) },
+  handler: async (ctx, { since, until, bodyIds }) => {
+    await recorded(ctx, "syncEvents", async () => {
+      const end = until ?? new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+      const raw = await legistarGet<Raw[]>("events", { $filter: eventsFilter(since, end, bodyIds) });
+      for (const [i, r] of raw.entries()) {
+        const event = parseEvent(r);
+        await ctx.runMutation(api.legistar.upsertEvent, event);
+        await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncEvent, { eventId: event.legistarId });
+      }
+    });
+  },
+});
+
+// One event: its items, their votes and tallies, and a syncMatter per linked matter.
+// The event row must already exist (upsertEventItem's hearing_scheduled check reads it).
+export const syncEvent = internalAction({
+  args: { eventId: v.number() },
+  handler: async (ctx, { eventId }) => {
+    await recorded(ctx, `syncEvent ${eventId}`, async () => {
+      const items = (await legistarGet<Raw[]>(`events/${eventId}/eventitems`)).map(parseEventItem);
+      for (const item of items) {
+        await ctx.runMutation(api.legistar.upsertEventItem, item);
+        if (!hasVotes(item)) continue;
+        const votes = (await legistarGet<Raw[]>(`eventitems/${item.legistarId}/votes`)).map((r) => parseVote(r, item.legistarId));
+        if (!votes.length) continue;
+        for (const vote of votes) await ctx.runMutation(api.legistar.ensurePerson, { legistarId: vote.personId, name: vote.personName });
+        await ctx.runMutation(api.legistar.replaceVotes, { eventItemId: item.legistarId, votes });
+        await ctx.runMutation(api.legistar.setEventItemTally, { eventItemLegistarId: item.legistarId, tally: computeTally(votes) });
+      }
+      for (const [i, matterId] of matterIdsOf(items).entries()) {
+        await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncMatter, { matterId });
+      }
+    });
+  },
+});
+
+// One matter: record, history steps, and attachment list (name + link).
+export const syncMatter = internalAction({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) => {
+    await recorded(ctx, `syncMatter ${matterId}`, async () => {
+      const matter = parseMatter(await legistarGet<Raw>(`matters/${matterId}`));
+      const attachments = (await legistarGet<Raw[]>(`matters/${matterId}/attachments`)).flatMap((a) =>
+        typeof a.MatterAttachmentHyperlink === "string" && a.MatterAttachmentHyperlink
+          ? [{ name: String(a.MatterAttachmentName ?? ""), hyperlink: a.MatterAttachmentHyperlink }]
+          : [],
+      );
+      await ctx.runMutation(api.legistar.upsertMatter, { ...matter, attachments });
+      for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
+        // Some rows carry no body (e.g. matter 74892 id 496081); a step with no body can't be shown, so skip it.
+        if (typeof h.MatterHistoryActionBodyName !== "string") continue;
+        await ctx.runMutation(api.legistar.upsertHistory, parseHistory(h, matterId));
+      }
+    });
+  },
+});
+
+// Current members of the three bodies (office record not yet ended); title becomes the role.
+export const syncPersons = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    await recorded(ctx, "syncPersons", async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      for (const bodyId of BODY_IDS) {
+        const rows = await legistarGet<Raw[]>("officerecords", { $filter: memberFilter(bodyId, today) });
+        for (const r of rows) {
+          await ctx.runMutation(api.legistar.upsertPerson, {
+            legistarId: r.OfficeRecordPersonId as number,
+            name: r.OfficeRecordFullName as string,
+            bodyId,
+            role: typeof r.OfficeRecordTitle === "string" && r.OfficeRecordTitle ? r.OfficeRecordTitle : undefined,
+          });
+        }
+      }
+    });
+  },
+});
+
+// Nightly full walk: persons, then events (which fan out to items and matters) since Jan 1.
+export const syncAll = internalAction({
+  args: { since: v.optional(v.string()) },
+  handler: async (ctx, { since }) => {
+    await ctx.scheduler.runAfter(0, internal.sync.syncPersons, {});
+    await ctx.scheduler.runAfter(0, internal.sync.syncEvents, {
+      since: since ?? "2026-01-01",
+      until: "2026-12-31",
+      bodyIds: BODY_IDS,
+    });
+  },
+});
+
+// Frequent refresh: 14 days back to 60 ahead.
+export const syncRecent = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    await ctx.runAction(internal.sync.syncEvents, { since: day(-14), until: day(60), bodyIds: BODY_IDS });
+  },
+});

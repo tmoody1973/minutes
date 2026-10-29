@@ -10,7 +10,7 @@ type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "person
 const CLEARABLE: Record<LegistarTable, string[]> = {
   events: ["clipId", "agendaUrl", "minutesUrl", "insiteUrl"],
   eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder"],
-  matters: ["introDate"],
+  matters: ["introDate", "attachments"],
   histories: ["passed", "eventId"],
   persons: ["bodyId", "role"],
 };
@@ -102,6 +102,7 @@ export const upsertMatter = mutation({
     typeName: v.string(),
     statusName: v.string(),
     introDate: v.optional(v.string()),
+    attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
   },
   handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
 });
@@ -134,6 +135,15 @@ export const upsertHistory = mutation({
 export const upsertPerson = mutation({
   args: { legistarId: v.number(), name: v.string(), bodyId: v.optional(v.number()), role: v.optional(v.string()) },
   handler: async (ctx, args) => out(await upsert(ctx, "persons", args)),
+});
+
+// Vote-derived person: insert if missing, never overwrite (would clear bodyId/role set from officerecords).
+export const ensurePerson = mutation({
+  args: { legistarId: v.number(), name: v.string() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.query("persons").withIndex("by_legistarId", (q) => q.eq("legistarId", args.legistarId)).unique();
+    if (!row) await ctx.db.insert("persons", args);
+  },
 });
 
 export const setEventItemTally = mutation({
