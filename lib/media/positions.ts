@@ -31,10 +31,12 @@ const PATTERNS: Array<[RegExp, "for" | "against"]> = [
 ];
 
 const FIRST_PERSON = /\b(?:i|we|i'm|we're|i'd|we'd|i'll|we'll|my|our)\b/g;
-// Anything between the subject and the end of the matched stance that flips, hedges or reassigns it.
-const BLOCKER =
-  /\b(?:not|never|no longer|neither|nor|hardly|cannot|\w+n't|should|would|could|might|may|if|you|you're|your|he|he's|she|she's|they|they're|them|their)\b/;
-const REPORTED = /\b(?:some|they|people|others|many) say\b/;
+// Anything earlier in the clause that flips, hedges, attributes or reassigns the stance.
+const BLOCKER = new RegExp(
+  String.raw`\b(?:not|never|no longer|neither|nor|cannot|\w+n't|unsure|should|would|could|might|may|if|` +
+    String.raw`said|says|say|thinks|think|thought|asked|asks|told|tells|heard|hears|believes|believe|claims|claimed|` +
+    String.raw`you|you're|your|he|he's|she|she's|his|her|they|they're|them|their|someone|somebody|people|everyone)\b`,
+);
 
 // Lowercase, straight apostrophes, collapse transcriber stutters ("to to" -> "to"). Matching only.
 function normalize(s: string): string {
@@ -54,10 +56,10 @@ function sentencePositions(sentence: string): Set<"for" | "against"> {
   const subjects = [...s.matchAll(FIRST_PERSON)].map((m) => m.index);
   for (const [re, position] of PATTERNS) {
     for (const m of s.matchAll(re)) {
-      const subject = subjects.filter((i) => i <= m.index).pop();
-      if (subject === undefined) continue;
-      const span = s.slice(subject, m.index + m[0].length);
-      if (BLOCKER.test(span) || REPORTED.test(s.slice(0, m.index))) continue;
+      if (!subjects.some((i) => i <= m.index)) continue;
+      // Whole prefix up to the end of the match, restarting after "but" (a new clause).
+      const prefix = s.slice(0, m.index + m[0].length).split(/\bbut\b/).pop() ?? "";
+      if (BLOCKER.test(prefix)) continue;
       found.add(position);
     }
   }

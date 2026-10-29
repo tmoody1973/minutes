@@ -28,6 +28,22 @@ const NULLS = [
   "I urge you to ask them whether they support it.",
   "Some say I should support this project.",
   "I would support this project if they changed it.",
+  "You said I support this project.",
+  "He thinks we oppose this.",
+  "They asked if I support this.",
+  "I heard you support this project.",
+  "We know you oppose this rezoning.",
+  "Is it true that I support this?",
+  "She said we support this project.",
+  "The mayor says we oppose this rezoning.",
+  "They told us we oppose this.",
+  "I'm not sure I support this project.",
+  "I don't know if I support this.",
+  "My neighbor said he opposes this and I support this project.",
+  "I told her I oppose this project.",
+  "You support this and I oppose this.",
+  "I urge them to approve this.",
+  "He urges you and I urge you to deny this.",
 ];
 
 const HITS: Array<[string, "for" | "against"]> = [
@@ -44,6 +60,9 @@ const HITS: Array<[string, "for" | "against"]> = [
   ["I urge the commission to vote no.", "against"],
   ["I'm for this.", "for"],
   ["I urge you to approve this item.", "for"],
+  ["The developer and I support this.", "for"],
+  ["I support this proposal at 123 N. Water St. and hope you do too.", "for"],
+  ["I oppose this project and they support it.", "against"],
   ["We stand in opposition to the proposal.", "against"],
 ];
 
