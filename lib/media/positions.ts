@@ -9,6 +9,8 @@ const NOUN =
 // "this"/"that" alone count only when they end the thought, so "support that the city..." is not a hit.
 const ALONE = String.raw`(?=\s*$|\s*[,;]|\s+(?:and|but|because|so|too)\b)`;
 const OBJ = String.raw`(?:it\b|this${ALONE}|that${ALONE}|(?:the|this)\s+(?:\w+\s+){0,3}?(?:${NOUN})s?\b(?!\s+(?:commission|team|staff|department|committee|board))|approv(?:ing|al)\s+(?:of|the|this|it|that)\b)`;
+// Strict item object for "urge ... to approve X": no modifiers, so "the other item" is not the item.
+const ITEM = String.raw`(?:it\b|this${ALONE}|that${ALONE}|(?:the|this)\s+(?:${NOUN})s?\b)`;
 const OF_FOR = String.raw`(?:\s+(?:of|for))?`;
 const FOR_WORD = String.raw`(?:in\s+(?:\w+\s+)?(?:support|favor)(?:\s+of)?|support(?:ing)?|(?:i'?m|we'?re|i am|we are)\s+for)`;
 const AGAINST_WORD = String.raw`(?:in\s+(?:\w+\s+)?opposition(?:\s+to)?|opposed\s+to|oppos(?:e|ing)|against)`;
@@ -19,8 +21,8 @@ const PATTERNS: Array<[RegExp, "for" | "against"]> = [
   [new RegExp(`${AGAINST_WORD}${OF_FOR}\\s+${OBJ}`, "g"), "against"],
   [new RegExp(`${FOR_WORD}${OF_FOR}\\s+a\\s+yes\\s+vote\\b`, "g"), "for"],
   [new RegExp(`${FOR_WORD}${OF_FOR}\\s+a\\s+no\\s+vote\\b`, "g"), "against"],
-  [/\burge\b.*?\b(?:approve|vote\s+yes)\b/g, "for"],
-  [/\burge\b.*?\b(?:deny|reject|vote\s+no)\b/g, "against"],
+  [new RegExp(String.raw`\burge\b.*?\b(?:approve\s+${ITEM}|vote\s+yes\b)`, "g"), "for"],
+  [new RegExp(String.raw`\burge\b.*?\b(?:(?:deny|reject)\s+${ITEM}|vote\s+no\b)`, "g"), "against"],
   // bare stance that ends the sentence: "I'm (just) (totally) against."
   [new RegExp(String.raw`\b(?:i|we)\s+${ADV}(?:support)\s*$`, "g"), "for"],
   [new RegExp(String.raw`\b(?:i|we)\s+${ADV}oppose\s*$`, "g"), "against"],
@@ -28,9 +30,11 @@ const PATTERNS: Array<[RegExp, "for" | "against"]> = [
   [new RegExp(String.raw`\b(?:i'?m|we'?re|i am|we are)\s+${ADV}(?:against|opposed)\s*$`, "g"), "against"],
 ];
 
-const FIRST_PERSON = /\b(?:i|we|i'm|we're|i'd|we'd|i'll|we'll|my|our)\b/;
-const OTHER_PERSON = /\b(?:you|you're|your|he|he's|she|she's|they|they're|them|their)\b/;
-const NEGATED = /\b(?:not|never|don't|doesn't|won't|can't|cannot|hardly)\b(?:\s+[\w']+){0,3}\s*$/;
+const FIRST_PERSON = /\b(?:i|we|i'm|we're|i'd|we'd|i'll|we'll|my|our)\b/g;
+// Anything between the subject and the end of the matched stance that flips, hedges or reassigns it.
+const BLOCKER =
+  /\b(?:not|never|no longer|neither|nor|hardly|cannot|\w+n't|should|would|could|might|may|if|you|you're|your|he|he's|she|she's|they|they're|them|their)\b/;
+const REPORTED = /\b(?:some|they|people|others|many) say\b/;
 
 // Lowercase, straight apostrophes, collapse transcriber stutters ("to to" -> "to"). Matching only.
 function normalize(s: string): string {
@@ -47,18 +51,48 @@ function normalize(s: string): string {
 function sentencePositions(sentence: string): Set<"for" | "against"> {
   const found = new Set<"for" | "against">();
   const s = normalize(sentence);
-  if (!FIRST_PERSON.test(s) || OTHER_PERSON.test(s)) return found;
+  const subjects = [...s.matchAll(FIRST_PERSON)].map((m) => m.index);
   for (const [re, position] of PATTERNS) {
     for (const m of s.matchAll(re)) {
-      if (!NEGATED.test(s.slice(0, m.index))) found.add(position);
+      const subject = subjects.filter((i) => i <= m.index).pop();
+      if (subject === undefined) continue;
+      const span = s.slice(subject, m.index + m[0].length);
+      if (BLOCKER.test(span) || REPORTED.test(s.slice(0, m.index))) continue;
+      found.add(position);
     }
   }
   return found;
 }
 
+const ABBREVIATIONS = new Set(
+  "st ave n s e w ne nw se sw ald mr ms mrs dr jr sr vs blvd rd ct sen rep gov hon mt".split(" "),
+);
+
+// Split on . ? ! but not after abbreviations, single capitals, "No. 5", or inside numbers.
+function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  for (const m of text.matchAll(/[.?!]+/g)) {
+    const end = m.index + m[0].length;
+    if (end < text.length && !/\s/.test(text[end])) continue;
+    if (m[0] === ".") {
+      const word = /([A-Za-z]+)$/.exec(text.slice(0, m.index))?.[1] ?? "";
+      const isAbbr =
+        ABBREVIATIONS.has(word.toLowerCase()) ||
+        (word.length === 1 && word === word.toUpperCase()) ||
+        (word.toLowerCase() === "no" && /^\s*\d/.test(text.slice(end)));
+      if (isAbbr) continue;
+    }
+    out.push(text.slice(start, end));
+    start = end;
+  }
+  out.push(text.slice(start));
+  return out;
+}
+
 export function statedPosition(text: string): StatedPosition | null {
   let hit: StatedPosition | null = null;
-  for (const raw of text.match(/[^.?!]+[.?!]*/g) ?? []) {
+  for (const raw of splitSentences(text)) {
     const quote = raw.trim();
     if (!quote || quote.endsWith("?")) continue;
     const found = sentencePositions(quote);

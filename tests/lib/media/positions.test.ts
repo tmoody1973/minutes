@@ -19,6 +19,15 @@ const NULLS = [
   "I support the City Plan Commission.",
   "I support this project. I oppose this project.",
   "I support them.",
+  "I urge you not to approve this.",
+  "I no longer support this project.",
+  "I wouldn't support this project.",
+  "I won't oppose this.",
+  "I urge you to approve the budget.",
+  "I urge you to approve the other item.",
+  "I urge you to ask them whether they support it.",
+  "Some say I should support this project.",
+  "I would support this project if they changed it.",
 ];
 
 const HITS: Array<[string, "for" | "against"]> = [
@@ -34,6 +43,7 @@ const HITS: Array<[string, "for" | "against"]> = [
   ["We urge you to deny this.", "against"],
   ["I urge the commission to vote no.", "against"],
   ["I'm for this.", "for"],
+  ["I urge you to approve this item.", "for"],
   ["We stand in opposition to the proposal.", "against"],
 ];
 
@@ -50,6 +60,13 @@ describe("statedPosition", () => {
   it("keeps stutters in the quote", () => {
     const r = statedPosition("I I urge and voice my support for a yes vote");
     expect(r?.quote).toBe("I I urge and voice my support for a yes vote");
+  });
+
+  it("does not split on abbreviations", () => {
+    const a = "I support this proposal at 123 N. Water St. and hope you do too.";
+    expect(statedPosition(a)).toEqual({ position: "for", quote: a });
+    const b = "Hi, I'm Ald. Smith and I support this project.";
+    expect(statedPosition(b)).toEqual({ position: "for", quote: b });
   });
 
   it("null when sentences disagree", () => {
