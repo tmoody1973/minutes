@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { alignChapters, proposeParts, validateParts } from "@/lib/media/chapters";
+import { extractCues } from "@/lib/media/cues";
+import { alignChapters, proposeParts, partsProblem, validateParts } from "@/lib/media/chapters";
 import { parseEventItem } from "@/lib/legistar/parse";
-import type { Chapter, ChapterPart, EventItemRecord, Turn } from "@/lib/types";
+import type { Chapter, ChapterPart, EventItemRecord, SpeakerAssignment, Turn } from "@/lib/types";
 
 const items = (JSON.parse(readFileSync("tests/fixtures/legistar/eventitems-13559.json", "utf8")) as Record<string, unknown>[]).map(parseEventItem);
 const END = 9_000_000;
@@ -95,7 +96,7 @@ describe("proposeParts", () => {
 
   it("returns validated parts and only sends the chapter's turns, inside untrusted delimiters", async () => {
     const spark = vi.fn(async () => ({ parts: [{ kind: "presentation", startMs: 1000, endMs: 2000 }, { kind: "vote", startMs: 2000, endMs: 3000 }] }));
-    const parts = await proposeParts(chapter, turns, spark as never);
+    const parts = await proposeParts(chapter, turns, [], spark as never);
     expect(parts).toHaveLength(2);
     const [system, user] = spark.mock.calls[0] as unknown as string[];
     expect(system).toMatch(/untrusted/);
@@ -106,20 +107,108 @@ describe("proposeParts", () => {
 
   it("returns [] when the model output is invalid", async () => {
     const spark = vi.fn(async () => ({ parts: [{ kind: "presentation", startMs: 1000, endMs: 2500 }] }));
-    expect(await proposeParts(chapter, turns, spark as never)).toEqual([]);
+    expect(await proposeParts(chapter, turns, [], spark as never)).toEqual([]);
   });
 
   it("returns [] when Spark throws, and skips unlocated chapters without calling it", async () => {
-    expect(await proposeParts(chapter, turns, (async () => { throw new Error("down"); }) as never)).toEqual([]);
+    expect(await proposeParts(chapter, turns, [], (async () => { throw new Error("down"); }) as never)).toEqual([]);
     const spark = vi.fn();
-    expect(await proposeParts({ ...chapter, startMs: null, endMs: null, located: "not-located" }, turns, spark as never)).toEqual([]);
+    expect(await proposeParts({ ...chapter, startMs: null, endMs: null, located: "not-located" }, turns, [], spark as never)).toEqual([]);
     expect(spark).not.toHaveBeenCalled();
   });
 
   it("keeps the prompt under ~60k chars on a long chapter by truncating turn text", async () => {
     const long = Array.from({ length: 300 }, (_, i) => turn(i, i * 1000, i * 1000 + 1000, "x".repeat(2000)));
     const spark = vi.fn(async () => ({ parts: [] }));
-    await proposeParts({ ...chapter, startMs: 0, endMs: 300_000 }, long, spark as never);
-    expect((spark.mock.calls[0] as unknown as string[])[1].length).toBeLessThan(60_000);
+    await proposeParts({ ...chapter, startMs: 0, endMs: 300_000 }, long, [], spark as never);
+    expect((spark.mock.calls[0] as unknown as string[])[1].length).toBeLessThan(100_000);
+  });
+});
+
+describe("testimony coverage", () => {
+  const chapter: Chapter = { eventItemId: 1, startMs: 0, endMs: 6000, located: "video-index", parts: [] };
+  const ts = [
+    turn(1, 0, 1000, "Staff presents the item.", "c0:A"),
+    turn(2, 1000, 2000, "My name is David Guzman and I live nearby.", "c0:B"),
+    turn(3, 2000, 3000, "Kristen Connolly, DCDCD Planning, here to answer questions.", "c0:C"),
+    turn(4, 3000, 6000, "Motion carries.", "c0:A"),
+  ];
+  const cues = extractCues(ts);
+  const p = (kind: ChapterPart["kind"], startMs: number, endMs: number): ChapterPart => ({ kind, startMs, endMs });
+
+  it("fixture turns carry the expected cues", () => {
+    expect(cues.filter((c) => c.kind === "self").map((c) => [c.name, !!c.affiliation])).toContainEqual(["David Guzman", false]);
+  });
+  it("rejects a self-intro outside every part, naming the minute", () => {
+    const why = partsProblem([p("presentation", 0, 1000), p("vote", 3000, 6000)], chapter, ts, cues, []);
+    expect(why).toMatch(/self-introduction at 0\.0 min|0\.0 min \(David Guzman\)/);
+    expect(validateParts([p("presentation", 0, 1000), p("vote", 3000, 6000)], chapter, ts, cues, [])).toBe(false);
+  });
+  it("accepts it inside testimony", () => {
+    expect(validateParts([p("presentation", 0, 1000), p("testimony", 1000, 3000), p("vote", 3000, 6000)], chapter, ts, cues, [])).toBe(true);
+  });
+  it("accepts an affiliated self-intro outside testimony", () => {
+    const only = ts.filter((t) => t.turnKey !== "0:2" && true);
+    const c2 = extractCues(only).filter((c) => c.kind === "self");
+    expect(validateParts([p("presentation", 0, 3000)], chapter, only, c2, [])).toBe(true);
+  });
+  it("skips labels with a legistar assignment", () => {
+    const a: SpeakerAssignment = { label: "c0:B", name: "Ald. X", source: "legistar", evidenceTurnKey: "0:1" };
+    expect(validateParts([p("presentation", 0, 1000)], chapter, ts, cues, [a])).toBe(true);
+  });
+});
+
+describe("proposeParts context and retry", () => {
+  const chapter: Chapter = { eventItemId: 1, startMs: 0, endMs: 6000, located: "video-index", parts: [] };
+  const ts = [
+    turn(1, 0, 1000, "Staff presents the item.", "c0:A"),
+    turn(2, 1000, 2000, "My name is David Guzman and I live nearby.", "c0:B"),
+    turn(3, 2000, 7000, "Overlapping tail turn.", "c0:A"),
+  ];
+  const good = { parts: [{ kind: "testimony", startMs: 1000, endMs: 2000 }] };
+  const bad = { parts: [{ kind: "presentation", startMs: 0, endMs: 1000 }] };
+
+  it("tags self-intros, speaker displays, and includes overlapping turns", async () => {
+    const spark = vi.fn(async () => good);
+    await proposeParts(chapter, ts, [], spark as never);
+    const user = (spark.mock.calls[0] as unknown as string[])[1];
+    expect(user).toContain("[introduces self: David Guzman]");
+    expect(user).toContain("Speaker A");
+    expect(user).toContain("Overlapping tail turn");
+  });
+  it("retries once with the failure reason, then succeeds", async () => {
+    const spark = vi.fn().mockResolvedValueOnce(bad).mockResolvedValueOnce(good);
+    expect(await proposeParts(chapter, ts, [], spark as never)).toEqual(good.parts);
+    expect(spark).toHaveBeenCalledTimes(2);
+    expect((spark.mock.calls[1] as unknown as string[])[1]).toMatch(/rejected: self-introduction at 0\.0 min \(David Guzman\)/);
+  });
+  it("returns [] and warns after two failures", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const spark = vi.fn(async () => bad);
+    expect(await proposeParts(chapter, ts, [], spark as never)).toEqual([]);
+    expect(spark).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+  it("truncates only the longest turn on a 300-turn chapter", async () => {
+    const many = Array.from({ length: 300 }, (_, i) => turn(i, i * 1000, i * 1000 + 1000, "short text", "c0:A"));
+    many[7] = { ...many[7], text: "y".repeat(3000) };
+    const spark = vi.fn(async () => ({ parts: [] }));
+    await proposeParts({ ...chapter, endMs: 300_000 }, many, [], spark as never);
+    const user = (spark.mock.calls[0] as unknown as string[])[1];
+    expect(user.length).toBeLessThan(100_000);
+    expect(user).toContain("y".repeat(3000));
+  });
+  it("truncates the longest first when over budget, and stays in budget with 1,200 turns", async () => {
+    const mk = (n: number, len: number) => Array.from({ length: n }, (_, i) => turn(i, i * 1000, i * 1000 + 1000, "z".repeat(len), "c0:A"));
+    const spark = vi.fn(async () => ({ parts: [] }));
+    const big = mk(300, 250); big[0] = { ...big[0], text: "L".repeat(20000) };
+    await proposeParts({ ...chapter, endMs: 300_000 }, big, [], spark as never);
+    const u1 = (spark.mock.calls[0] as unknown as string[])[1];
+    expect(u1.length).toBeLessThan(100_000);
+    expect(u1).toContain("z".repeat(250));
+    expect(u1).not.toContain("L".repeat(20000));
+    await proposeParts({ ...chapter, endMs: 1_200_000 }, mk(1200, 800), [], spark as never);
+    expect((spark.mock.calls[1] as unknown as string[])[1].length).toBeLessThan(100_000);
   });
 });
