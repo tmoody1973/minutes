@@ -17,4 +17,6 @@
 
 **How we'll know if this was right:** On every demo project, the drawn lot matches the subject site on the file's exhibit map when checked by eye. If SAM ships, it agrees with the city outline or correctly flags the ones that differ.
 
+**What we learned (2026-10-29):** We tried three ways to get SAM to confirm the blue "Subject Site" outline on the exhibit maps for files 260532 and 260533, and none worked. (1) Giving SAM a box drawn around the site made it agree 93% and 99%, but that was circular: we handed it the answer, so it proved nothing. (2) Pointing SAM at the center of the site scored 24% and 0.4%, because the center sits on a building or a car, and SAM outlined that object instead. (3) Pointing SAM at a spot on the dashed blue line scored 1.1% and 0.8%: it outlined a short stretch of the dashes, not the whole site. A dashed line is not a solid shape, which is what SAM is built to find. Per this decision, the SAM check is cut. The city-records outline stays the only source for the drawn lot, and the detection code and tests stay in the repo as a record of the attempt.
+
 **What actually happened:**

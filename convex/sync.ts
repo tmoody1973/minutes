@@ -3,6 +3,8 @@ import { internal } from "./_generated/api";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { legistarGet } from "../lib/legistar/client";
 import { parseEvent, parseEventItem, parseHistory, parseMatter, parseVote } from "../lib/legistar/parse";
+import { extractAddresses } from "../lib/geo/address";
+import { resolveParcels } from "../lib/geo/mprop";
 import { computeTally } from "../lib/legistar/tally";
 import { eventsFilter, hasVotes, isMatterFresh, matterIdsOf, memberFilter } from "../lib/legistar/plan";
 
@@ -12,6 +14,7 @@ type Raw = Record<string, unknown>;
 const BODY_IDS = [1, 11, 272];
 // Fan-out spacing: scheduled jobs start this far apart so Legistar (a public city API) sees a trickle.
 const STAGGER_MS = 1000;
+const PARCEL_RECHECK_MS = 7 * 86_400_000;
 
 type Scope = "top" | "child";
 
@@ -63,6 +66,15 @@ export const syncEvents = internalAction({
           await ctx.scheduler.runAfter(i * STAGGER_MS, internal.sync.syncEvent, { eventId: event.legistarId });
         });
       }
+      // A cancelled meeting disappears from Legistar's list but not from our table: mark its items removed (the
+      // normal upsert clears the mark if it comes back). Only events in this window and these bodies are considered.
+      const returned = new Set(raw.map((r) => r.EventId as number));
+      for (const eventId of await ctx.runQuery(internal.legistar.eventIdsInWindow, { since, until: end, bodyIds })) {
+        if (returned.has(eventId)) continue;
+        await c.attempt(`dropped event ${eventId}`, async () => {
+          await ctx.runMutation(internal.legistar.markEventItemsRemoved, { eventId, presentIds: [], at: Date.now() });
+        });
+      }
     });
   },
 });
@@ -100,9 +112,10 @@ export const syncEvent = internalAction({
 
 // One matter: record, history steps, and attachment list (name + link). Skipped if synced recently.
 export const syncMatter = internalAction({
-  args: { matterId: v.number() },
-  handler: async (ctx, { matterId }) => {
-    if (isMatterFresh(await ctx.runQuery(internal.legistar.matterSyncedAt, { matterId }), Date.now())) return;
+  // force: re-sync even if fresh (backfills fields added after the matter was last synced, e.g. parcels).
+  args: { matterId: v.number(), force: v.optional(v.boolean()) },
+  handler: async (ctx, { matterId, force }) => {
+    if (!force && isMatterFresh(await ctx.runQuery(internal.legistar.matterSyncedAt, { matterId }), Date.now())) return;
     await recorded(ctx, "child", `syncMatter ${matterId}`, async (c) => {
       const matter = parseMatter(await legistarGet<Raw>(`matters/${matterId}`));
       const attachments = (await legistarGet<Raw[]>(`matters/${matterId}/attachments`)).flatMap((a) =>
@@ -110,7 +123,33 @@ export const syncMatter = internalAction({
           ? [{ name: String(a.MatterAttachmentName ?? ""), hyperlink: a.MatterAttachmentHyperlink }]
           : [],
       );
-      await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
+      const { changedFields, inserted } = await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
+      // Lots named in the title. parcels is replaced only when EVERY address resolved without error; otherwise the
+      // stored value stays and the failure is recorded (so the matter is not stamped fresh and is retried).
+      // No addresses clears parcels. Unset = no addresses; [] = addresses exist but none resolved.
+      // Politeness: the city's MPROP and parcel services are only asked when the title changed, parcels were never
+      // looked up, or the last completed check is over 7 days old (the nightly run then refreshes weekly).
+      const checkedAt = await ctx.runQuery(internal.legistar.matterParcelsCheckedAt, { matterId });
+      const due = inserted || changedFields.includes("title") || checkedAt === null || Date.now() - checkedAt > PARCEL_RECHECK_MS;
+      const addresses = extractAddresses(matter.title);
+      if (!due) {
+        // Fresh and unchanged: keep the stored lots, make no calls.
+      } else if (!addresses.length) {
+        await c.attempt("parcels", async () => {
+          await ctx.runMutation(internal.legistar.setMatterParcels, { matterId });
+        });
+      } else {
+        await c.attempt("parcels", async () => {
+          const { parcels, errors, skipped } = await resolveParcels(addresses);
+          // Refused addresses are final, not transient: log them but do not block the fresh stamp.
+          skipped.forEach((m) => console.warn(`syncMatter ${matterId}: skipped ${m}`));
+          if (errors.length) {
+            errors.forEach((e) => c.errors.push(`parcels ${e}`));
+            return;
+          }
+          await ctx.runMutation(internal.legistar.setMatterParcels, { matterId, parcels });
+        });
+      }
       for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
         // Some rows carry no body (e.g. matter 74892 id 496081); a step with no body can't be shown, so skip it.
         if (typeof h.MatterHistoryActionBodyName !== "string") continue;

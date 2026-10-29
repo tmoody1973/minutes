@@ -1,0 +1,37 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20261011062849/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub9.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# Planned Development (295-907-1)
+295-907. Planned Development District (PD/DPD). 1. PURPOSES. The planned development district is
+intended to:
+     a.        Allow flexibility in land development.
+     b.        Promote creativity, variety and environmental sensitivity.
+     c.        Encourage development compatible with its surroundings and consistent with the city's
+comprehensive plan.
+
+# General Planned Development (295-907-2-a)
+a one-phase or a 2-phase process. If actual development of the project is to proceed in stages over an
+extended period of time, the applicant shall first submit a general plan covering the entire tract. Separate
+detailed plans shall then be submitted for each stage of development and shall follow the development
+concept established by the general plan. If development of the project is not to be done in stages, a general
+plan is optional and a single detailed plan may be submitted in lieu thereof.
+
+# Detailed Planned Development (295-907-2-j)
+     j.       Limitation on Permit Issuance. Within any planned development district, no building permits may
+be issued and no site work may be commenced until a detailed plan has been approved by the common
+council and a copy of the ordinance has been certified by the city clerk. Existing buildings located in a general
+
+# Minor modification (to a Detailed Planned Development) (295-907-2-i)
+     i.       Minor Modifications. The common council may by resolution approve modifications to approved
+detailed plans which are consistent with the spirit and intent of the general planned development or a
+previously approved detailed planned development provided the common council finds that the modification
+will not:
+     i-1.     Change the general character of the planned development.
+     i-2.     Cause a substantial relocation of principal or accessory structures.
+     i-3.     Cause a substantial relocation or reduction of parking, loading or recreation areas.
+     i-4.     Cause a substantial relocation of traffic facilities.
+     i-5.     Increase the land coverage of buildings and parking areas.
+     i-6.     Increase the gross floor area of buildings or the number of dwelling units.
+     i-7.     Reduce the amount of approved open space, landscaping or screening.

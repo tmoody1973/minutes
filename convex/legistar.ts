@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
-import { tallyV } from "./schema";
+import { boxV, parcelV, tallyV } from "./schema";
+import { syncMatterLocation } from "./locations";
 
 type Upserted = { inserted: boolean; changedFields: string[] };
 type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "persons";
@@ -116,7 +117,66 @@ export const upsertMatter = internalMutation({
     introDate: v.optional(v.string()),
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
   },
-  handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
+  handler: async (ctx, args) => {
+    const r = out(await upsert(ctx, "matters", args));
+    await syncMatterLocation(ctx, args.legistarId);
+    return r;
+  },
+});
+
+// parcels has its own writer: it is not in CLEARABLE, so a matter upsert that doesn't carry it leaves it alone.
+export const setMatterParcels = internalMutation({
+  // parcels omitted = clear the field (the title no longer names any address).
+  args: { matterId: v.number(), parcels: v.optional(v.array(parcelV)) },
+  handler: async (ctx, { matterId, parcels }) => {
+    const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
+    if (row) await ctx.db.patch(row._id, { parcels, parcelsCheckedAt: Date.now() });
+    await syncMatterLocation(ctx, matterId);
+  },
+});
+
+export const matterParcelsCheckedAt = internalQuery({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) =>
+    (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.parcelsCheckedAt ?? null,
+});
+
+// Stored events in a sync window for the requested bodies (ids only), for spotting meetings Legistar dropped.
+export const eventIdsInWindow = internalQuery({
+  args: { since: v.string(), until: v.string(), bodyIds: v.array(v.number()) },
+  handler: async (ctx, { since, until, bodyIds }) =>
+    (await ctx.db.query("events").collect())
+      .filter((e) => bodyIds.includes(e.bodyId) && e.startsAt.slice(0, 10) >= since && e.startsAt.slice(0, 10) <= until)
+      .map((e) => e.legistarId),
+});
+
+export const getMatterParcels = internalQuery({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) =>
+    (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.parcels ?? null,
+});
+
+export const getMatterByFileNumber = internalQuery({
+  args: { fileNumber: v.string() },
+  handler: async (ctx, { fileNumber }) => (await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first()) ?? null,
+});
+
+export const setExhibitCheck = internalMutation({
+  args: {
+    fileNumber: v.string(),
+    noConflict: v.boolean(),
+    iou: v.number(),
+    method: v.literal("outline-point"),
+    colorBox: v.union(boxV, v.null()),
+    samBox: v.union(boxV, v.null()),
+    reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),
+    checkedAt: v.number(),
+  },
+  handler: async (ctx, { fileNumber, ...exhibitCheck }) => {
+    const row = await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first();
+    if (!row) throw new Error(`no matter with file number ${fileNumber}`);
+    await ctx.db.patch(row._id, { exhibitCheck }); // patch replaces the whole nested object, so no stale legacy fields survive
+  },
 });
 
 export const matterSyncedAt = internalQuery({

@@ -1,0 +1,37 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20250310131106/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub8.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# Industrial-Office (IO1) (295-801-1)
+295-801. Purposes. 1. INDUSTRIAL-OFFICE (IO). This district provides sites for modern, clean industry and
+supporting, non-residential land uses that complement industrial uses or require an industrial environment.
+Older portions of this zoning district (IO2) often form corridors which provide a buffer between residential
+areas and more intensive industrial districts. The newer portions of this district (IO1) are in the form of office-
+industrial parks or business parks with campus-style layouts and designs. The IO district has a performance-
+oriented transition area where it adjoins residential neighborhoods. Buffering and other requirements in the
+transition area are intended to protect the character of such neighborhoods.
+
+# Industrial-Light (IL1) (295-801-2)
+     2.          INDUSTRIAL-LIGHT (IL). This district is intended to provide sites primarily for light industrial
+uses that utilize medium-sized buildings and do not have extensive outdoor storage areas or operations. This
+district includes both older industrial corridors (IL2) and modern industrial parks (IL1). While most buildings
+contain clean, light industrial uses, some commercial and office uses may also be included. This district
+contains heavier uses than the IO district and requires more extensive buffering from adjoining residential
+areas.
+
+# Industrial-Mixed (IM) (295-801-4)
+     4.          INDUSTRIAL-MIXED (IM). This district is intended to provide for the orderly conversion of
+certain older industrial and warehousing areas with multi-story buildings to residential, commercial or office
+uses for which the buildings, at the present time, may be better suited. These areas have an urban character.
+ Buildings were typically built without setbacks or yards and often with little or no off-street parking.
+
+# Industrial-Heavy (IH) (295-801-5)
+     5.          INDUSTRIAL-HEAVY (IH). This district accommodates high-intensity industry and often
+includes very large structures, extensive exterior storage, exterior mechanical operations, or heavy truck or
+equipment operations. It also accommodates uses that require large or isolated sites or harbor, airport or rail
+service. This district includes the historic industrial core of the city. It has a strong relationship to shipping and
+rail services and includes the port of Milwaukee, the Menomonee valley and various railroad corridors. Most
+sites within the IH district have already been developed or redeveloped. These sites seldom have excess land
+to provide buffer areas. Where possible, the IH district should be separated from residential neighborhoods
+with less intensive, non-residential districts.

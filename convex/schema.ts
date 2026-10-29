@@ -4,6 +4,20 @@ import { v } from "convex/values";
 // Field names mirror lib/types.ts (the source of truth).
 export const tallyV = v.object({ aye: v.number(), no: v.number(), excused: v.number(), other: v.number() });
 
+// One lot named in a matter title. Unknown MPROP values are null (never 0 / ""). Shared with legistar.ts.
+export const parcelV = v.object({
+  taxkey: v.string(),
+  address: v.string(),
+  zoning: v.union(v.string(), v.null()),
+  alder: v.union(v.number(), v.null()),
+  lotAreaSqFt: v.union(v.number(), v.null()),
+  owner: v.union(v.string(), v.null()),
+  polygon: v.union(v.any(), v.null()),
+  centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
+});
+
+export const boxV = v.object({ x1: v.number(), y1: v.number(), x2: v.number(), y2: v.number() });
+
 export default defineSchema({
   bodies: defineTable({ legistarId: v.number(), name: v.string() }).index("by_legistarId", ["legistarId"]),
   events: defineTable({
@@ -47,7 +61,40 @@ export default defineSchema({
     syncedAt: v.optional(v.number()),
     // Exhibit list (name + hyperlink) from matters/{id}/attachments; Milestone 2 reads exhibit maps from it.
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
+    // Lots named in the title, from MPROP + the city parcel map. Unset = title has no addresses (or never looked up);
+    // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
+    parcels: v.optional(v.array(parcelV)),
+    // ms epoch of the last completed parcel resolve (success or all addresses skipped); unset = never looked up.
+    // Written only by setMatterParcels. syncMatter resolves again only on a title change or when this is over 7 days old.
+    parcelsCheckedAt: v.optional(v.number()),
+    // Point-prompted SAM check of the exhibit map's "Subject Site" outline against the color-detected one. It records
+    // whether the two conflict; it never changes what is drawn. Written only by setExhibitCheck (replaced whole each run).
+    // `agrees` is the legacy field from the first (box-prompted, circular) version: kept so old rows validate, never written.
+    exhibitCheck: v.optional(v.object({
+      agrees: v.optional(v.boolean()),
+      noConflict: v.optional(v.boolean()),
+      iou: v.number(),
+      method: v.optional(v.union(v.literal("point-prompt"), v.literal("outline-point"))),
+      colorBox: v.optional(v.union(boxV, v.null())),
+      samBox: v.optional(v.union(boxV, v.null())),
+      reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),
+      checkedAt: v.number(),
+    })),
   }).index("by_legistarId", ["legistarId"]),
+  // Slim read model for near-me: one row per zoning-kind matter that has at least one parcel centroid.
+  // Maintained by upsertMatter / setMatterParcels (convex/locations.ts); no polygons, so reads stay small.
+  matterLocations: defineTable({
+    matterId: v.number(),
+    fileNumber: v.string(),
+    title: v.string(),
+    kind: v.string(),
+    statusName: v.string(),
+    centroids: v.array(v.object({ lat: v.number(), lng: v.number() })),
+  })
+    .index("by_kind", ["kind"])
+    .index("by_matter", ["matterId"]),
+  // Global fixed-window counters (key = what is limited).
+  rateLimits: defineTable({ key: v.string(), windowStart: v.number(), count: v.number() }).index("by_key", ["key"]),
   histories: defineTable({
     legistarId: v.number(),
     matterId: v.number(),

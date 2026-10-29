@@ -1,0 +1,38 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub6.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20250323063843/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub6.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# Neighborhood Shopping (NS2) (295-601-1)
+     1.       NEIGHBORHOOD SHOPPING DISTRICTS (NS1-NS2). These districts provide for residential
+uses as well as commercial uses that serve the neighborhood. Such commercial uses are necessary to
+satisfy basic shopping and service needs that occur frequently and must, therefore, be located close to
+residential areas. The character of these districts is intended to be compatible with that of surrounding
+residential neighborhoods. Buildings in these districts are typically smaller in scale than those found in local
+business districts. The NS1 district is characterized by a more suburban development pattern, with larger lots
+and deeper setbacks, while the development pattern in the NS2 district tends to be more urban, with smaller
+lots and smaller setbacks.
+
+# Local Business (LB1) (295-601-2)
+     2.       LOCAL BUSINESS DISTRICTS (LB1-LB3). These districts provide a wide range of goods and
+services to a large consumer population coming from an extensive area. Within these districts, motor-vehicle-
+related activities are of major significance. Good access by motor vehicle or public transit is important to local
+business districts, which are often located adjacent to intersections of major thoroughfares and in close
+proximity to bus transfer locations. The LB1 district is characterized by a more suburban development pattern,
+with larger lots and deeper setbacks, while the development pattern in the LB2 district tends to be more urban,
+with smaller lots and smaller setbacks. The LB3 district is the most urban and is characterized by design
+standards appropriate for neighborhood commercial hubs, centers, corridors and transit-oriented development
+areas that have a denser level of development and may have taller buildings, all of which promote compact,
+walkable, sustainable neighborhoods.
+
+# Local Business (LB2) (295-601-2)
+     2.       LOCAL BUSINESS DISTRICTS (LB1-LB3). These districts provide a wide range of goods and
+services to a large consumer population coming from an extensive area. Within these districts, motor-vehicle-
+related activities are of major significance. Good access by motor vehicle or public transit is important to local
+business districts, which are often located adjacent to intersections of major thoroughfares and in close
+proximity to bus transfer locations. The LB1 district is characterized by a more suburban development pattern,
+with larger lots and deeper setbacks, while the development pattern in the LB2 district tends to be more urban,
+with smaller lots and smaller setbacks. The LB3 district is the most urban and is characterized by design
+standards appropriate for neighborhood commercial hubs, centers, corridors and transit-oriented development
+areas that have a denser level of development and may have taller buildings, all of which promote compact,
+walkable, sustainable neighborhoods.
