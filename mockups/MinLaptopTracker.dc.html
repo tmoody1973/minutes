@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Minutes · Development near you (laptop)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#1F56C2}a:hover{color:#10203A}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1000px; background: #F7F7F4; color: #10203A; font-family: 'Public Sans', system-ui, sans-serif">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCDFE5">
+<div style="max-width: 1360px; margin: 0 auto; padding: 10px 28px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px">
+<a href="MinPhoneHome.dc.html" style="text-decoration: none; color: #10203A; display: flex; align-items: baseline; gap: 10px">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em">Minutes</span>
+<span style="font-size: 13px; color: #5B6577">Milwaukee City Hall, in minutes</span>
+</a>
+<nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 2px">
+<a href="MinPhoneHome.dc.html" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">This week</a>
+<a href="MinLaptopTracker.dc.html" aria-current="page" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #1F56C2; font-weight: 700; font-size: 15px; box-shadow: inset 0 -3px 0 #1F56C2">Development</a>
+<a href="MinLaptopMeeting.dc.html" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">Meetings</a>
+<a href="#files" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">Files</a>
+<a href="#ask" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+Ask</a>
+</nav>
+<button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #DCDFE5; background: #F7F7F4; color: #10203A; font-weight: 600; font-size: 14px; cursor: pointer">[Your address] · District [N]</button>
+</div>
+</header>
+
+<main style="max-width: 1360px; margin: 0 auto; padding: 24px 28px 40px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.01em">Development near you</h1>
+<p style="margin: 0; font-size: 16px; color: #5B6577">Zoning and building proposals within a mile, from Plan Commission to Council.</p>
+</div>
+<div role="group" aria-label="Filter" style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.pressed}}" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1.5px solid #10203A; background: {{f.bg}}; color: {{f.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">{{f.label}}</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<section aria-label="Proposals" style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shown}}" as="p" hint-placeholder-count="4">
+<button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" style="text-align: left; padding: 14px; border-radius: 12px; border: {{p.border}}; background: #FFFFFF; color: #10203A; cursor: pointer; display: flex; flex-direction: column; gap: 6px">
+<span style="font: 600 10px 'IBM Plex Mono', monospace; letter-spacing: 0.06em; color: #5B6577">{{p.kind}}</span>
+<span style="font-weight: 800; font-size: 17px; line-height: 1.25">{{p.addr}}</span>
+<span style="align-self: flex-start; padding: 4px 10px; border-radius: 12px; background: {{p.toneBg}}; color: {{p.toneFg}}; font-weight: 700; font-size: 13px">{{p.status}}</span>
+</button>
+</sc-for>
+</section>
+
+<section aria-label="Map" style="flex: 2 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #DCDFE5; border-radius: 14px; overflow: hidden">
+<div style="position: relative; height: 520px; background: #EEF1F5">
+<svg width="100%" height="100%" viewBox="0 0 600 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position: absolute; inset: 0; display: block">
+<g fill="#FFFFFF">
+<rect x="20" y="20" width="160" height="110" rx="4"></rect><rect x="210" y="20" width="160" height="110" rx="4"></rect><rect x="400" y="20" width="180" height="110" rx="4"></rect>
+<rect x="20" y="160" width="160" height="150" rx="4"></rect><rect x="210" y="160" width="160" height="150" rx="4"></rect><rect x="400" y="160" width="180" height="150" rx="4"></rect>
+<rect x="20" y="340" width="160" height="160" rx="4"></rect><rect x="210" y="340" width="160" height="160" rx="4"></rect><rect x="400" y="340" width="180" height="160" rx="4"></rect>
+</g>
+<circle cx="300" cy="235" r="210" fill="none" stroke="#1F56C2" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5"></circle>
+</svg>
+<span style="position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #10203A; border: 3px solid #FFFFFF; box-shadow: 0 0 0 1px #10203A"></span>
+<span style="position: absolute; left: calc(50% + 14px); top: calc(45% - 10px); padding: 2px 8px; border-radius: 8px; background: #10203A; color: #FFFFFF; font-size: 12px; font-weight: 700">You</span>
+<sc-for list="{{pins}}" as="pin" hint-placeholder-count="3">
+<button type="button" onClick="{{pin.pick}}" aria-label="{{pin.label}}" style="position: absolute; left: {{pin.left}}; top: {{pin.top}}; transform: translate(-50%, -100%); width: 44px; height: 44px; border: none; background: transparent; cursor: pointer; padding: 0">
+<svg width="44" height="44" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.6 7-12a7 7 0 1 0-14 0c0 5.4 7 12 7 12z" fill="{{pin.fill}}" stroke="#FFFFFF" stroke-width="1.5"></path><circle cx="12" cy="10" r="2.6" fill="#FFFFFF"></circle></svg>
+</button>
+</sc-for>
+</div>
+<p style="margin: 0; padding: 10px 14px; font-size: 13px; color: #5B6577; border-top: 1px solid #DCDFE5">Blue pins have a hearing coming up. Citywide changes appear in the list only.</p>
+</section>
+
+<aside aria-label="Selected proposal" style="flex: 1.4 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DCDFE5; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<span style="font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: 0.06em; color: #5B6577">{{sel.kind}} · FILE [######]</span>
+<h2 style="margin: 0; font-size: 26px; line-height: 1.15; font-weight: 800">{{sel.addr}}</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5">{{sel.summary}}</p>
+<span style="align-self: flex-start; padding: 6px 12px; border-radius: 14px; background: {{sel.toneBg}}; color: {{sel.toneFg}}; font-weight: 700; font-size: 14px">{{sel.status}}</span>
+
+<div style="display: flex; flex-direction: column; padding-top: 4px">
+<h3 style="margin: 0 0 10px 0; font-size: 15px; font-weight: 800">Where it is in the process</h3>
+<sc-for list="{{sel.steps}}" as="s" hint-placeholder-count="5">
+<div style="display: flex; gap: 12px">
+<div aria-hidden="true" style="width: 20px; flex: none; display: flex; flex-direction: column; align-items: center">
+<div style="width: 20px; height: 20px; border-radius: 50%; box-sizing: border-box; background: {{s.dotBg}}; border: {{s.dotBorder}}"></div>
+<div style="flex: 1; width: 0; border-left: {{s.line}}; min-height: 14px"></div>
+</div>
+<div style="padding-bottom: 10px; display: flex; flex-direction: column; gap: 1px">
+<span style="font-weight: {{s.weight}}; font-size: 15px; color: {{s.color}}">{{s.name}}</span>
+<span style="font-size: 13px; color: #5B6577">{{s.note}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<a href="MinLaptopMeeting.dc.html" style="flex: 1 1 160px; height: 46px; border-radius: 10px; background: #1F56C2; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Watch the hearing</a>
+<a href="#comment" style="flex: 1 1 160px; height: 46px; border-radius: 10px; border: 1.5px solid #10203A; color: #10203A; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">How to comment</a>
+</div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #5B6577">Public records only, no recommendations. Built by a sitting City Plan Commission member. <a href="#about">About</a></p>
+</aside>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const sel = this.state.sel == null ? 0 : this.state.sel;
+    const filter = this.state.filter || 'all';
+    const tone = {
+      upcoming: { bg: '#FDF1DC', fg: '#8A4B00' },
+      decided: { bg: '#EEF1F5', fg: '#10203A' }
+    };
+    const stepNames = ['Introduced at Common Council', 'City Plan Commission', 'Zoning, Neighborhoods & Development committee', 'Common Council vote', 'Mayor signs or vetoes'];
+    const projects = [
+      { addr: '[Street address]', kind: 'REZONING TO DPD', status: 'Committee hearing [Tue, Nov 10]', t: 'upcoming', stage: 2,
+        summary: 'A [4]-story building with [48] apartments and ground-floor [retail].', notes: ['[Sep 22]', 'Recommended [approval] · [Oct 26]', 'Public hearing [Nov 10]', 'Expected [Nov 18]', ''], left: '62%', top: '58%' },
+      { addr: '[Street address]', kind: 'CONDITIONAL USE', status: 'Plan Commission [Mon, Nov 16]', t: 'upcoming', stage: 1,
+        summary: 'A [use] in an existing building at [address].', notes: ['[Oct 13]', 'Public hearing [Nov 16]', '', '', ''], left: '30%', top: '30%' },
+      { addr: '[Street address]', kind: 'SALE OF CITY-OWNED LOT', status: 'Council vote [Wed, Nov 18]', t: 'upcoming', stage: 3,
+        summary: 'Sale of a vacant city-owned lot to [buyer] for [use].', notes: ['[Sep 8]', 'Recommended [approval] · [Sep 28]', 'Recommended [approval] · [Oct 20]', 'Vote expected [Nov 18]', ''], left: '78%', top: '82%' },
+      { addr: 'Citywide zoning text change', kind: 'ZONING CODE', status: 'Decided [Oct 28]', t: 'decided', stage: 5,
+        summary: 'Changes the zoning code rules for [topic] across the city.', notes: ['[Aug 4]', 'Recommended [approval]', 'Recommended [approval]', 'Adopted [Oct 13]', 'Signed [Oct 28]'], left: null, top: null }
+    ];
+    const pickTo = (i) => () => this.setState({ sel: i });
+    const enriched = projects.map((p, i) => ({
+      ...p,
+      i,
+      pick: pickTo(i),
+      pressed: sel === i ? 'true' : 'false',
+      border: sel === i ? '2px solid #1F56C2' : '1px solid #DCDFE5',
+      toneBg: tone[p.t].bg,
+      toneFg: tone[p.t].fg
+    }));
+    const shown = enriched.filter((p) => filter === 'all' || p.t === filter);
+    const pins = enriched.filter((p) => p.left).map((p) => ({
+      left: p.left, top: p.top, pick: p.pick,
+      label: p.kind + ', ' + p.status,
+      fill: sel === p.i ? '#10203A' : (p.t === 'upcoming' ? '#1F56C2' : '#9AA3B2')
+    }));
+    const s = enriched[sel];
+    const steps = stepNames.map((name, k) => {
+      const done = k < s.stage;
+      const cur = k === s.stage;
+      return {
+        name,
+        note: s.notes[k] || '',
+        dotBg: done ? '#10203A' : '#FFFFFF',
+        dotBorder: done ? '2px solid #10203A' : (cur ? '5px solid #1F56C2' : '2px solid #9AA3B2'),
+        line: k === stepNames.length - 1 ? 'none' : (done ? '2px solid #10203A' : '2px dashed #9AA3B2'),
+        weight: cur ? '800' : (done ? '700' : '600'),
+        color: cur ? '#1F56C2' : (done ? '#10203A' : '#5B6577')
+      };
+    });
+    const filters = [['upcoming', 'Upcoming hearings'], ['decided', 'Decided'], ['all', 'All']].map(([id, label]) => ({
+      label,
+      pick: () => this.setState({ filter: id }),
+      bg: filter === id ? '#10203A' : '#FFFFFF',
+      fg: filter === id ? '#FFFFFF' : '#10203A',
+      pressed: filter === id ? 'true' : 'false'
+    }));
+    return { filters, shown, pins, sel: { ...s, steps } };
+  }
+}
+</script>
+</body>
+</html>

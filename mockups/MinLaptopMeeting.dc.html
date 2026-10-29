@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Minutes · Readable meeting (laptop)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#1F56C2}a:hover{color:#10203A}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1000px; background: #F7F7F4; color: #10203A; font-family: 'Public Sans', system-ui, sans-serif">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCDFE5">
+<div style="max-width: 1360px; margin: 0 auto; padding: 10px 28px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px">
+<a href="MinPhoneHome.dc.html" style="text-decoration: none; color: #10203A; display: flex; align-items: baseline; gap: 10px">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em">Minutes</span>
+<span style="font-size: 13px; color: #5B6577">Milwaukee City Hall, in minutes</span>
+</a>
+<nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 2px">
+<a href="MinPhoneHome.dc.html" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">This week</a>
+<a href="MinLaptopTracker.dc.html" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">Development</a>
+<a href="MinLaptopMeeting.dc.html" aria-current="page" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #1F56C2; font-weight: 700; font-size: 15px; box-shadow: inset 0 -3px 0 #1F56C2">Meetings</a>
+<a href="#files" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">Files</a>
+<a href="#ask" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #10203A; font-weight: 600; font-size: 15px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+Ask</a>
+</nav>
+<button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #DCDFE5; background: #F7F7F4; color: #10203A; font-weight: 600; font-size: 14px; cursor: pointer">[Your address] · District [N]</button>
+</div>
+</header>
+
+<main style="max-width: 1360px; margin: 0 auto; padding: 22px 28px 40px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: 0.08em; color: #5B6577">CITY PLAN COMMISSION · [MON, OCT 26]</span>
+<h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.01em">The meeting in [7] chapters</h1>
+<p style="margin: 0; font-size: 16px; color: #5B6577">[2 hr 14 min] · [3] decisions · [9] public speakers</p>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<nav aria-label="Chapters" style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{chapters}}" as="c" hint-placeholder-count="7">
+<button type="button" onClick="{{c.pick}}" aria-current="{{c.current}}" style="min-height: 56px; padding: 10px 12px; border-radius: 10px; border: {{c.border}}; background: {{c.bg}}; color: #10203A; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer">
+<span style="width: 24px; height: 24px; flex: none; border-radius: 50%; background: {{c.numBg}}; color: {{c.numFg}}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px">{{c.n}}</span>
+<span style="flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-weight: 700; font-size: 14px; line-height: 1.3">{{c.title}}</span>
+<span style="font-size: 12px; color: #5B6577">{{c.result}}</span>
+</span>
+<span style="font: 500 11px 'IBM Plex Mono', monospace; color: #5B6577">{{c.time}}</span>
+</button>
+</sc-for>
+</nav>
+
+<section aria-label="Video and transcript" style="flex: 2.2 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+<div style="position: relative; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #10203A">
+<div aria-hidden="true" style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 34px 40px 80px 40px; box-sizing: border-box">
+<div style="border-radius: 6px; background: #22324D"></div><div style="border-radius: 6px; background: #22324D"></div><div style="border-radius: 6px; background: #22324D"></div>
+</div>
+<button type="button" aria-label="Play from {{sel.time}}" style="position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; border: none; background: #FFFFFF; color: #10203A; display: flex; align-items: center; justify-content: center; cursor: pointer">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+</button>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px; display: flex; align-items: center; gap: 12px; background: rgba(16,32,58,0.92); color: #FFFFFF">
+<span style="font: 500 12px 'IBM Plex Mono', monospace">{{sel.time}}</span>
+<div aria-hidden="true" style="flex: 1; height: 4px; border-radius: 2px; background: #3B4A63; position: relative"><div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{sel.progress}}; border-radius: 2px; background: #FFFFFF"></div></div>
+<span style="font: 500 12px 'IBM Plex Mono', monospace">2:14:00</span>
+</div>
+<div style="position: absolute; right: 14px; top: 14px; width: 150px; padding: 6px; border-radius: 8px; background: #FFFFFF; color: #10203A; display: flex; flex-direction: column; gap: 4px">
+<div aria-hidden="true" style="height: 70px; border-radius: 4px; background: #EEF1F5; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 8px; box-sizing: border-box"><div style="height: 6px; width: 70%; background: #10203A"></div><div style="height: 4px; width: 90%; background: #9AA3B2"></div><div style="height: 4px; width: 80%; background: #9AA3B2"></div></div>
+<span style="font-size: 11px; font-weight: 600">Slide captured from the video</span>
+</div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCDFE5; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 800">{{sel.title}}</h2>
+<span style="font-size: 13px; color: #5B6577">Transcript · speaker names matched from the roll call</span>
+</div>
+<sc-for list="{{sel.turns}}" as="t" hint-placeholder-count="4">
+<div style="display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid #EEF1F5">
+<a href="#t" style="width: 64px; flex: none; font: 500 12px 'IBM Plex Mono', monospace; padding-top: 2px">{{t.time}}</a>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-weight: 700; font-size: 14px">{{t.who}} <span style="font-weight: 500; color: #5B6577">· {{t.role}}</span></span>
+<span style="font-size: 15px; line-height: 1.5">{{t.text}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<aside aria-label="Decision and sources" style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+<section style="background: #FFFFFF; border: 1px solid #DCDFE5; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: 0.08em; color: #5B6577">DECISION</h2>
+<p style="margin: 0; font-size: 20px; font-weight: 800; line-height: 1.25">{{sel.result}}</p>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{votes}}" as="v" hint-placeholder-count="7">
+<div style="min-height: 34px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #EEF1F5; font-size: 14px">
+<span>{{v.name}}</span><span style="font-weight: 700">{{v.vote}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DCDFE5; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: 0.08em; color: #5B6577">WHAT HAPPENS NEXT</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.5">Goes to the Zoning, Neighborhoods &amp; Development committee for a public hearing on [Tue, Nov 10].</p>
+<a href="MinLaptopTracker.dc.html" style="font-size: 14px; font-weight: 700">Follow this project</a>
+</section>
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: 0.08em; color: #5B6577">SOURCES</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<a href="#agenda" style="padding: 7px 12px; border-radius: 8px; border: 1px solid #DCDFE5; background: #FFFFFF; text-decoration: none; font: 600 12px 'IBM Plex Mono', monospace">Agenda</a>
+<a href="#staff" style="padding: 7px 12px; border-radius: 8px; border: 1px solid #DCDFE5; background: #FFFFFF; text-decoration: none; font: 600 12px 'IBM Plex Mono', monospace">Staff report</a>
+<a href="#exhibit" style="padding: 7px 12px; border-radius: 8px; border: 1px solid #DCDFE5; background: #FFFFFF; text-decoration: none; font: 600 12px 'IBM Plex Mono', monospace">Exhibit A</a>
+<a href="#file" style="padding: 7px 12px; border-radius: 8px; border: 1px solid #DCDFE5; background: #FFFFFF; text-decoration: none; font: 600 12px 'IBM Plex Mono', monospace">File [######]</a>
+</div>
+</section>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #5B6577">Public records only, no recommendations. Built by a sitting City Plan Commission member, whose statements and votes appear here like every other member's. <a href="#about">About</a></p>
+</aside>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const sel = this.state.sel == null ? 3 : this.state.sel;
+    const data = [
+      { title: 'Call to order and roll call', result: '[6] of [7] members present', time: '0:00:00' },
+      { title: 'Minutes of the last meeting', result: 'Approved', time: '0:03:10' },
+      { title: '[Address]: conditional use', result: 'Recommended [approval], [vote]', time: '0:06:25' },
+      { title: '[Address]: rezoning to DPD', result: 'Recommended [approval], [vote]', time: '0:41:10' },
+      { title: 'Zoning code text change', result: 'Held to [Nov 16]', time: '1:14:02' },
+      { title: '[Area] plan update', result: 'Presentation only, no vote', time: '1:38:45' },
+      { title: 'Adjournment', result: '', time: '2:14:00' }
+    ];
+    const chapters = data.map((c, i) => ({
+      ...c,
+      n: i + 1,
+      pick: () => this.setState({ sel: i }),
+      current: sel === i ? 'true' : 'false',
+      border: sel === i ? '2px solid #1F56C2' : '1px solid #DCDFE5',
+      bg: sel === i ? '#FFFFFF' : '#FFFFFF',
+      numBg: sel === i ? '#1F56C2' : '#EEF1F5',
+      numFg: sel === i ? '#FFFFFF' : '#10203A',
+      time: c.time.replace(/:00$/, '').replace(/^0:/, '0:')
+    }));
+    const turns = [
+      { time: '0:41:10', who: '[Staff planner]', role: 'Department of City Development', text: '[Summary of the proposal as presented, in the speaker’s own words.]' },
+      { time: '0:48:30', who: '[Applicant]', role: 'Applicant', text: '[What the applicant said about the project.]' },
+      { time: '0:55:05', who: '[Public speaker 1]', role: 'Public testimony, for', text: '[Testimony exactly as spoken.]' },
+      { time: '0:58:40', who: 'Speaker D', role: 'Public testimony, against · name not confirmed', text: '[Testimony exactly as spoken.]' }
+    ];
+    const s = data[sel];
+    const votes = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ name: '[Commissioner ' + n + ']', vote: n === 7 ? 'Absent' : '[Aye]' }));
+    return {
+      chapters,
+      votes,
+      sel: { ...s, turns, progress: Math.round((sel / 6) * 100) + '%' }
+    };
+  }
+}
+</script>
+</body>
+</html>

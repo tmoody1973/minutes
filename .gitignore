@@ -1,0 +1,8 @@
+.env*.local
+.env
+node_modules/
+.next/
+scripts/phase1/out/
+data/
+.DS_Store
+__pycache__/
