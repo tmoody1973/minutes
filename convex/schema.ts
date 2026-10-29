@@ -78,6 +78,52 @@ export default defineSchema({
   })
     .index("by_sourceKey", ["sourceKey"])
     .index("by_matter", ["matterId"]),
+  // ---- Milestone 3: derived meeting data (ids are Legistar ids) ----
+  turns: defineTable({
+    eventId: v.number(),
+    turnKey: v.string(),
+    chunk: v.number(),
+    startMs: v.number(),
+    endMs: v.number(),
+    label: v.optional(v.string()),
+    text: v.string(),
+    source: v.union(v.literal("transcript"), v.literal("captions")),
+  })
+    .index("by_event", ["eventId", "startMs"])
+    .index("by_event_turnKey", ["eventId", "turnKey"]),
+  speakerAssignments: defineTable({
+    eventId: v.number(),
+    label: v.string(),
+    name: v.string(),
+    personId: v.optional(v.number()),
+    source: v.union(v.literal("legistar"), v.literal("self-intro"), v.literal("manual")),
+    evidenceTurnKey: v.string(),
+  }).index("by_event", ["eventId"]),
+  // Human decisions: never touched by ingest.
+  speakerOverrides: defineTable({ eventId: v.number(), label: v.string(), name: v.string(), by: v.string(), at: v.number() }).index(
+    "by_event_label",
+    ["eventId", "label"],
+  ),
+  // Model decisions (Muse Spark confirm/reject), reused on re-ingest. candidateKey = `${label}|${name}|${evidenceTurnKey}`.
+  speakerConfirmations: defineTable({
+    eventId: v.number(),
+    candidateKey: v.string(),
+    confirm: v.boolean(),
+    reason: v.string(),
+    model: v.string(),
+    at: v.number(),
+  }).index("by_event_candidate", ["eventId", "candidateKey"]),
+  chapters: defineTable({
+    eventId: v.number(),
+    eventItemId: v.number(),
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
+    located: v.union(v.literal("video-index"), v.literal("cue"), v.literal("not-located")),
+    parts: v.array(v.object({ kind: v.string(), startMs: v.number(), endMs: v.number() })),
+    // "model" = Chapterer parts stored (reusable); "none" = model returned nothing valid (reusable); absent = not attempted.
+    partsSource: v.optional(v.union(v.literal("model"), v.literal("none"))),
+    partsReason: v.optional(v.string()),
+  }).index("by_event", ["eventId"]),
   syncRuns: defineTable({
     startedAt: v.number(),
     finishedAt: v.number(),
