@@ -51,7 +51,7 @@ describe("lookupParcel", () => {
   });
 
   it("an address range matches parcels overlapping it", async () => {
-    const range = { ...SOUTHGATE, houseNumber: 3470, houseNumberHigh: 3480 };
+    const range = { ...SOUTHGATE, houseNumber: 3471, houseNumberHigh: 3481 };
     expect((await lookupParcels(range, { fetchImpl: fakeFetch(southgate) })).map((p) => p.taxkey)).toEqual(["5331104000"]);
   });
 
@@ -185,8 +185,10 @@ describe("Ruling 33: parity", () => {
   it("parity applies to address ranges too; single-number rows ignore parity", async () => {
     const evenRange = { ...SOUTHGATE, houseNumber: 3472, houseNumberHigh: 3472 };
     expect(await lookupParcels(evenRange, { fetchImpl: fakeFetch(southgate) })).toEqual([]);
-    // 3472-3474 contains odd 3473 which is on the row
-    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472, houseNumberHigh: 3474 }, { fetchImpl: fakeFetch(southgate) })).toHaveLength(1);
+    // Ruling 40: 3472-3474 is the even side; the odd row 3441-3473 is the other side of the street.
+    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472, houseNumberHigh: 3474 }, { fetchImpl: fakeFetch(southgate) })).toEqual([]);
+    // An odd range does reach the odd row.
+    expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3471, houseNumberHigh: 3475 }, { fetchImpl: fakeFetch(southgate) })).toHaveLength(1);
     const single = rows(row({ HOUSE_NR_LO: "3472", HOUSE_NR_HI: "3472" }));
     expect(await lookupParcels({ ...SOUTHGATE, houseNumber: 3472 }, { fetchImpl: fakeFetch(single) })).toHaveLength(1);
   });
@@ -269,5 +271,30 @@ describe("Ruling 33: polygon and centroid safety", () => {
     const r = await resolveParcels([bad], { fetchImpl: fakeFetch(southgate) });
     expect(r.errors).toEqual([]);
     expect(r.skipped).toHaveLength(1);
+  });
+});
+
+describe("Ruling 40: range parity", () => {
+  const KANE: Address = { houseNumber: 1162, houseNumberHigh: 1164, dir: "E", street: "KANE", type: "PL" };
+  const kane = (lo: string, hi: string, taxkey = "3730000000") => rows(row({ HOUSE_NR_LO: lo, HOUSE_NR_HI: hi, STREET: "KANE", SDIR: "E", STTYPE: "PL", TAXKEY: taxkey }));
+  it("an even range never matches a single odd row inside it", async () => {
+    expect(await lookupParcels(KANE, { fetchImpl: fakeFetch(kane("1163", "1163")) })).toEqual([]);
+  });
+  it("an even range matches a single even row", async () => {
+    expect(await lookupParcels(KANE, { fetchImpl: fakeFetch(kane("1162", "1162")) })).toHaveLength(1);
+  });
+  it("a multi-number row only matches a range of its own parity", async () => {
+    expect(await lookupParcels(KANE, { fetchImpl: fakeFetch(kane("1161", "1169")) })).toEqual([]);
+    expect(await lookupParcels(KANE, { fetchImpl: fakeFetch(kane("1160", "1170")) })).toHaveLength(1);
+  });
+});
+
+describe("Ruling 40: polygon vertex cap", () => {
+  const ring = (n: number) => Array.from({ length: n }, (_, i) => [i, i]);
+  const feature = (coordinates: number[][][]) => ({ features: [{ properties: { TAXKEY: "5331104000" }, geometry: { type: "Polygon", coordinates } }] });
+  it("a polygon over 5,000 vertices is dropped (null), 5,000 is kept", async () => {
+    expect(await fetchParcelPolygon("5331104000", { fetchImpl: fakeFetch({}, feature([ring(5001)])) })).toBeNull();
+    expect(await fetchParcelPolygon("5331104000", { fetchImpl: fakeFetch({}, feature([ring(2500), ring(2501)])) })).toBeNull();
+    expect(await fetchParcelPolygon("5331104000", { fetchImpl: fakeFetch({}, feature([ring(5000)])) })).not.toBeNull();
   });
 });

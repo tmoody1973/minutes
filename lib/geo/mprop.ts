@@ -9,6 +9,7 @@ const MAX_PAGES = 20;
 const MAX_RANGE_SPAN = 200;
 const MAX_PARCELS_PER_ADDRESS = 10;
 const PAGE_SIZE = 5000;
+const MAX_POLYGON_VERTICES = 5000;
 const FIELDS = "TAXKEY,HOUSE_NR_LO,HOUSE_NR_HI,SDIR,STREET,STTYPE,ZONING,GEO_ALDER,LOT_AREA,OWNER_NAME_1";
 
 export class InvalidAddressError extends Error {
@@ -105,8 +106,13 @@ export async function lookupParcels(a: Address, { fetchImpl = fetch, pageSize = 
     const rHi = Number.parseInt(r.HOUSE_NR_HI ?? "", 10);
     if (!Number.isInteger(rLo) || !Number.isInteger(rHi) || rLo > hi || rHi < lo) continue;
     // A multi-number row (3441-3473) holds one side of the street: only numbers with LO's parity belong to it.
+    // An address range (1162-1164) names one side too: only numbers with its low number's parity count, so a
+    // single odd row (1163) inside an even range is the other side of the street and is skipped (Ruling 40).
+    const isRange = a.houseNumberHigh !== undefined;
+    if (isRange && rLo !== rHi && (rLo - lo) % 2 !== 0) continue; // the two sides disagree
     let first = Math.max(lo, rLo);
-    if (rLo !== rHi && (first - rLo) % 2 !== 0) first += 1;
+    if (isRange && (first - lo) % 2 !== 0) first += 1;
+    else if (!isRange && rLo !== rHi && (first - rLo) % 2 !== 0) first += 1;
     if (first > Math.min(hi, rHi)) continue;
     if (a.type && r.STTYPE !== a.type) continue;
     const p = toParcel(r);
@@ -138,7 +144,10 @@ export async function fetchParcelPolygon(taxkey: string, { fetchImpl = fetch }: 
   const f = body.features?.length === 1 ? body.features[0] : null;
   if (f?.properties?.TAXKEY !== taxkey) return null;
   const g = f.geometry;
-  return g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
+  if (!g || (g.type !== "Polygon" && g.type !== "MultiPolygon")) return null;
+  // ponytail: an outline this large would bloat the matters doc; no outline beats a heavy one.
+  const rings = g.type === "Polygon" ? g.coordinates : g.coordinates.flat();
+  return rings.reduce((n, r) => n + (Array.isArray(r) ? r.length : 0), 0) > MAX_POLYGON_VERTICES ? null : g;
 }
 
 /** Center of the bounding box of the outer ring(s); null if the geometry has no usable coordinates. Cheap and
