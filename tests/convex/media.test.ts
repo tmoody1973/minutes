@@ -71,3 +71,31 @@ describe("model decisions", () => {
     expect((await t.query(internal.media.chaptersForEvent, { eventId: 2 }))[0].parts).toHaveLength(1);
   });
 });
+
+describe("meetingView source and automatic names", () => {
+  it("returns per-turn source and transcriptSource; captions and none", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.media.upsertTurns, { eventId: 1, turns: [{ ...turn("cap:0", 0, undefined), source: "captions" as const }] });
+    await t.mutation(internal.media.upsertTurns, { eventId: 2, turns: [turn("0:1", 0, "c0:A")] });
+    const cap = await t.query(api.media.meetingView, { eventId: 1 });
+    expect(cap.transcriptSource).toBe("captions");
+    expect(cap.turns[0].source).toBe("captions");
+    expect((await t.query(api.media.meetingView, { eventId: 2 })).transcriptSource).toBe("transcript");
+    const none = await t.query(api.media.meetingView, { eventId: 3 });
+    expect(none.transcriptSource).toBe("none");
+    expect(none.turns).toEqual([]);
+  });
+  it("shows an automatic assignment's name; self-intro is asHeard, legistar is not", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.media.upsertTurns, { eventId: 1, turns: [turn("0:1", 0, "c0:A"), turn("0:2", 20, "c0:B"), turn("0:3", 40, "c0:C")] });
+    await t.mutation(internal.media.replaceAssignments, {
+      eventId: 1,
+      assignments: [
+        { label: "c0:A", name: "Official Person", personId: 7, source: "legistar", evidenceTurnKey: "0:1" },
+        { label: "c0:B", name: "Resident Heard", source: "self-intro", evidenceTurnKey: "0:2" },
+      ],
+    });
+    const v = await t.query(api.media.meetingView, { eventId: 1 });
+    expect(v.turns.map((x) => [x.display, x.asHeard])).toEqual([["Official Person", false], ["Resident Heard", true], ["Speaker A", false]]);
+  });
+});

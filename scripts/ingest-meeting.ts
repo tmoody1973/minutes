@@ -1,10 +1,15 @@
-// Usage: npx tsx scripts/ingest-meeting.ts <eventId> [--reconfirm]
+// Usage: npx tsx scripts/ingest-meeting.ts <eventId> [--reconfirm | --reparts]
+//   --reconfirm  re-ask Muse Spark for speaker confirmations AND chapter parts
+//   --reparts    refresh chapter parts only; stored speaker confirmations are still reused
+// NOTE: turns, speaker assignments and chapters are written by SEPARATE mutations (not one transaction).
+// A run that fails midway can leave an event mixed (e.g. new turns with old assignments or chapters).
+// Re-running the script heals it: every step is idempotent per event, and stored model decisions are reused.
 // Stitches a local transcript (or fetches city captions), names speakers, aligns chapters, and writes
 // validated results to DEV Convex via internal functions. Re-runs reuse stored model decisions (Rulings 17, 22).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { alignChapters, proposeParts } from "../lib/media/chapters";
 import { extractCues } from "../lib/media/cues";
-import { batchBySize, candidateKey, reuseOrCall } from "../lib/media/ingest";
+import { batchBySize, candidateKey, chunkFiles, namesFingerprint, outageRow, partsDecision, reuseOrCall } from "../lib/media/ingest";
 import { assignFromCues, confirmAssignments, nameSpeakers, validateAssignment, type RosterEntry } from "../lib/media/speakers";
 import { stitchChunks } from "../lib/media/stitch";
 import { parseVtt } from "../lib/media/vtt";
@@ -16,7 +21,7 @@ const MODEL = "muse-spark-1.3";
 const BATCH_BYTES = 150_000;
 const UA = "Minutes/0.1 (tarik@radiomilwaukee.org)";
 
-type StoredChapter = { eventItemId: number; startMs?: number; endMs?: number; located: string; parts: ChapterPart[]; partsSource?: "model" | "none"; partsReason?: string };
+type StoredChapter = { namesFingerprint?: string; eventItemId: number; startMs?: number; endMs?: number; located: string; parts: ChapterPart[]; partsSource?: "model" | "none"; partsReason?: string };
 
 let sparkCalls = 0;
 let sparkErrors = 0;
@@ -33,7 +38,7 @@ const counted = (async (...a: Parameters<typeof sparkJSON>) => {
 async function loadTurns(eventId: number, clipId: number | null): Promise<{ turns: Turn[]; source: "transcript" | "captions" }> {
   const dir = `data/transcripts/${eventId}`;
   if (existsSync(dir)) {
-    const chunks = readdirSync(dir).filter((f) => /^chunk_\d+\.json$/.test(f)).sort().map((f) => JSON.parse(readFileSync(`${dir}/${f}`, "utf8")));
+    const chunks = chunkFiles(readdirSync(dir), dir).map((f) => JSON.parse(readFileSync(`${dir}/${f}`, "utf8")));
     return { turns: stitchChunks(eventId, chunks), source: "transcript" };
   }
   if (clipId === null) throw new Error(`event ${eventId}: no local transcript and no clipId for captions`);
@@ -49,7 +54,7 @@ async function writeTurns(eventId: number, turns: Turn[], source: "transcript" |
   for (const turns_ of batchBySize(turns.map((t) => turnRow(t, source)), BATCH_BYTES)) convexRun("media:upsertTurns", { eventId, turns: turns_ });
   const keep = new Set(turns.map((t) => t.turnKey));
   const stale = convexRun<string[]>("media:turnKeysForEvent", { eventId }).filter((k) => !keep.has(k));
-  for (const b of batchBySize(stale, BATCH_BYTES)) convexRun("media:removeTurns", { eventId, turnKeys: b });
+  for (const b of batchBySize(stale, BATCH_BYTES, 1000)) convexRun("media:removeTurns", { eventId, turnKeys: b });
   return stale.length;
 }
 
@@ -80,13 +85,14 @@ async function nameStep(eventId: number, bodyId: number, turns: Turn[], reconfir
   return { validated, reused, newConf: fresh.length };
 }
 
-async function chapterStep(eventId: number, turns: Turn[], assignments: SpeakerAssignment[], withParts: boolean, reconfirm: boolean) {
+async function chapterStep(eventId: number, turns: Turn[], assignments: SpeakerAssignment[], withParts: boolean, reconfirm: boolean, reparts: boolean) {
   const items = convexRun<EventItemRecord[]>("media:itemsForEvent", { eventId });
   const meetingEnd = Math.max(0, ...turns.map((t) => t.endMs));
   const aligned = alignChapters(items, turns, meetingEnd);
   const prior = new Map(convexRun<StoredChapter[]>("media:chaptersForEvent", { eventId }).map((c) => [c.eventItemId, c]));
   const overrides = convexRun<{ label: string; name: string; at: number }[]>("media:overridesForEvent", { eventId });
   const forParts = [...assignments, ...overrides.map((o) => ({ label: o.label, name: o.name, source: "manual" as const, evidenceTurnKey: "", at: o.at }))];
+  const fingerprint = namesFingerprint(forParts);
   const rows: StoredChapter[] = [];
   for (const c of aligned) {
     const base: StoredChapter = { eventItemId: c.eventItemId, located: c.located, parts: [], ...(c.startMs !== null ? { startMs: c.startMs } : {}), ...(c.endMs !== null ? { endMs: c.endMs } : {}) };
@@ -95,15 +101,15 @@ async function chapterStep(eventId: number, turns: Turn[], assignments: SpeakerA
       continue;
     }
     const old = prior.get(c.eventItemId);
-    if (!reconfirm && old?.partsSource && old.startMs === c.startMs && old.endMs === c.endMs) {
-      rows.push({ ...base, parts: old.parts, partsSource: old.partsSource, ...(old.partsReason ? { partsReason: old.partsReason } : {}) });
+    if (partsDecision({ old, window: { startMs: c.startMs, endMs: c.endMs! }, fingerprint, reconfirm, reparts }) === "reuse") {
+      rows.push({ ...base, parts: old!.parts, partsSource: old!.partsSource, namesFingerprint: fingerprint, ...(old!.partsReason ? { partsReason: old!.partsReason } : {}) });
       continue;
     }
     const errsBefore = sparkErrors;
     const parts = await proposeParts(c, turns, forParts, counted);
-    if (sparkErrors > errsBefore && parts.length === 0) rows.push(base); // model failure: leave unattempted so a re-run retries
-    else if (parts.length) rows.push({ ...base, parts, partsSource: "model" });
-    else rows.push({ ...base, partsSource: "none", partsReason: "no valid parts returned" });
+    if (sparkErrors > errsBefore && parts.length === 0) rows.push(outageRow(base, old)); // outage: keep old parts; with none stored, stay unattempted so a re-run retries
+    else if (parts.length) rows.push({ ...base, parts, partsSource: "model", namesFingerprint: fingerprint });
+    else rows.push({ ...base, partsSource: "none", partsReason: "no valid parts returned", namesFingerprint: fingerprint });
   }
   convexRun("media:replaceChapters", { eventId, chapters: rows });
   return rows;
@@ -113,6 +119,7 @@ async function main() {
   process.loadEnvFile(".env.local");
   const args = process.argv.slice(2);
   const reconfirm = args.includes("--reconfirm");
+  const reparts = args.includes("--reparts");
   const eventId = Number(args.find((a) => !a.startsWith("--")));
   if (!eventId) throw new Error("usage: ingest-meeting.ts <eventId> [--reconfirm]");
   const ev = convexRun<{ bodyId: number; clipId: number | null } | null>("media:eventByLegistarId", { legistarId: eventId });
@@ -125,7 +132,7 @@ async function main() {
   let newConf = 0;
   if (source === "transcript") ({ validated: assignments, reused, newConf } = await nameStep(eventId, ev.bodyId, turns, reconfirm));
   else convexRun("media:replaceAssignments", { eventId, assignments: [] });
-  const chapters = await chapterStep(eventId, turns, assignments, source === "transcript", reconfirm);
+  const chapters = await chapterStep(eventId, turns, assignments, source === "transcript", reconfirm, reparts);
 
   const named = nameSpeakers(turns, assignments).filter((n) => !/^(Speaker |Unidentified)/.test(n.display)).length;
   const located = chapters.filter((c) => c.located !== "not-located").length;

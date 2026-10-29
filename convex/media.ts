@@ -27,6 +27,7 @@ const chapterV = v.object({
   parts: v.array(v.object({ kind: v.string(), startMs: v.number(), endMs: v.number() })),
   partsSource: v.optional(v.union(v.literal("model"), v.literal("none"))),
   partsReason: v.optional(v.string()),
+  namesFingerprint: v.optional(v.string()),
 });
 
 // ---- writes (internal; called by scripts/ingest-meeting.ts via `npx convex run`) ----
@@ -184,7 +185,8 @@ export const meetingView = query({
     const names = new Map(nameSpeakers(turns, accepted).map((n) => [n.turnKey, n]));
     const chapters = await ctx.db.query("chapters").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
     return {
-      turns: turns.map((t) => ({ turnKey: t.turnKey, startMs: t.startMs, endMs: t.endMs, text: t.text, label: t.label, display: names.get(t.turnKey)!.display, asHeard: names.get(t.turnKey)!.asHeard })),
+      transcriptSource: (rows[0]?.source ?? "none") as "transcript" | "captions" | "none",
+      turns: turns.map((t, i) => ({ source: rows[i].source, turnKey: t.turnKey, startMs: t.startMs, endMs: t.endMs, text: t.text, label: t.label, display: names.get(t.turnKey)!.display, asHeard: names.get(t.turnKey)!.asHeard })),
       chapters: chapters.map((c) => ({ eventItemId: c.eventItemId, startMs: c.startMs ?? null, endMs: c.endMs ?? null, located: c.located, parts: c.parts })),
     };
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { batchBySize, candidateKey, labelOrder, reuseOrCall } from "@/lib/media/ingest";
+import { batchBySize, candidateKey, chunkFiles, labelOrder, namesFingerprint, outageRow, partsDecision, reuseOrCall } from "@/lib/media/ingest";
 
 describe("batchBySize", () => {
   it("splits so each batch JSON stays under the limit", () => {
@@ -33,4 +33,51 @@ describe("labelOrder", () => {
     const turns = [{ label: "c0:B" }, { label: null }, { label: "c0:A" }, { label: "c0:B" }] as { label: string | null }[];
     expect(labelOrder(turns)).toEqual(["c0:B", "c0:A"]);
   });
+});
+
+describe("batchBySize row cap", () => {
+  it("caps items per batch", () => {
+    const b = batchBySize(Array.from({ length: 2500 }, (_, i) => i), 1_000_000, 1000);
+    expect(b.map((x) => x.length)).toEqual([1000, 1000, 500]);
+  });
+});
+
+describe("namesFingerprint", () => {
+  it("is stable under order and changes when a name changes", () => {
+    const a = namesFingerprint([{ label: "c0:A", name: "X" }, { label: "c0:B", name: "Y" }]);
+    expect(namesFingerprint([{ label: "c0:B", name: "Y" }, { label: "c0:A", name: "X" }])).toBe(a);
+    expect(namesFingerprint([{ label: "c0:A", name: "Z" }, { label: "c0:B", name: "Y" }])).not.toBe(a);
+    expect(namesFingerprint([])).toBe(namesFingerprint([]));
+  });
+});
+
+describe("partsDecision", () => {
+  const old = { startMs: 1, endMs: 2, partsSource: "model" as const, namesFingerprint: "f" };
+  const base = { window: { startMs: 1, endMs: 2 }, fingerprint: "f", reconfirm: false, reparts: false };
+  it("reuses when window and fingerprint match", () => expect(partsDecision({ ...base, old })).toBe("reuse"));
+  it("refreshes when a name changed", () => expect(partsDecision({ ...base, old, fingerprint: "g" })).toBe("refresh"));
+  it("refreshes when the window moved", () => expect(partsDecision({ ...base, old, window: { startMs: 1, endMs: 3 } })).toBe("refresh"));
+  it("refreshes with --reparts and --reconfirm", () => {
+    expect(partsDecision({ ...base, old, reparts: true })).toBe("refresh");
+    expect(partsDecision({ ...base, old, reconfirm: true })).toBe("refresh");
+  });
+  it("refreshes with no prior row, no source, or no stored fingerprint", () => {
+    expect(partsDecision({ ...base, old: undefined })).toBe("refresh");
+    expect(partsDecision({ ...base, old: { ...old, partsSource: undefined } })).toBe("refresh");
+    expect(partsDecision({ ...base, old: { ...old, namesFingerprint: undefined } })).toBe("refresh");
+  });
+});
+
+describe("outageRow", () => {
+  const fresh = { eventItemId: 1, located: "cue", parts: [] };
+  it("keeps the old parts, source and fingerprint", () => {
+    const old = { eventItemId: 1, located: "cue", parts: [{ kind: "testimony", startMs: 1, endMs: 2 }], partsSource: "model" as const, namesFingerprint: "f" };
+    expect(outageRow(fresh, old)).toEqual(old);
+  });
+  it("falls back to the bare row when there is no old row", () => expect(outageRow(fresh, undefined)).toEqual(fresh));
+});
+
+describe("chunkFiles", () => {
+  it("sorts chunk files", () => expect(chunkFiles(["chunk_001.json", "x.txt", "chunk_000.json"], "d")).toEqual(["chunk_000.json", "chunk_001.json"]));
+  it("throws on a directory with no chunks", () => expect(() => chunkFiles(["notes.txt"], "data/transcripts/1")).toThrow(/no chunk_\*\.json/));
 });

@@ -123,6 +123,8 @@ export default defineSchema({
     // "model" = Chapterer parts stored (reusable); "none" = model returned nothing valid (reusable); absent = not attempted.
     partsSource: v.optional(v.union(v.literal("model"), v.literal("none"))),
     partsReason: v.optional(v.string()),
+    // Hash of the speaker names the Chapterer saw; parts are reused only while it is unchanged.
+    namesFingerprint: v.optional(v.string()),
   }).index("by_event", ["eventId"]),
   syncRuns: defineTable({
     startedAt: v.number(),
