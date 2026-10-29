@@ -6,6 +6,8 @@ const NULLS = [
   "is he in for or against it",
   "No offense against them however it does not serve current Milwaukee professionals such as myself.",
   "I'm here just to support the design team",
+  "I support the area plan.",
+  "I support the zoning change.",
   "we're just here for support",
   "succinctly state your your position for against or undecided and try and add on",
   "It is certainly something we're happy to to support in whatever general way we can.",
@@ -66,6 +68,8 @@ const HITS: Array<[string, "for" | "against"]> = [
   ["I support this proposal at 123 N. Water St. and hope you do too.", "for"],
   ["I oppose this project and they support it.", "against"],
   ["We stand in opposition to the proposal.", "against"],
+  ["I support this plan.", "for"],
+  ["I support the development.", "for"],
 ];
 
 describe("statedPosition", () => {

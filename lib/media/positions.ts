@@ -4,11 +4,14 @@
 
 export type StatedPosition = { position: "for" | "against"; quote: string };
 
+// Generic nouns count only as "this/the <noun>" with no modifiers: "the area plan" is not the item.
+const BARE_NOUN = "plan|change|development";
 const NOUN =
   "proposal|project|development|rezoning|ordinance|item|file|moratorium|amendment|application|plan|change";
+const MODIFIABLE_NOUN = "proposal|project|rezoning|ordinance|item|file|moratorium|amendment|application";
 // "this"/"that" alone count only when they end the thought, so "support that the city..." is not a hit.
 const ALONE = String.raw`(?=\s*$|\s*[,;]|\s+(?:and|but|because|so|too)\b)`;
-const OBJ = String.raw`(?:it\b|this${ALONE}|that${ALONE}|(?:the|this)\s+(?:\w+\s+){0,3}?(?:${NOUN})s?\b(?!\s+(?:commission|team|staff|department|committee|board))|approv(?:ing|al)\s+(?:of|the|this|it|that)\b)`;
+const OBJ = String.raw`(?:it\b|this${ALONE}|that${ALONE}|(?:the|this)\s+(?:(?:\w+\s+){0,3}?(?:${MODIFIABLE_NOUN})|(?:${BARE_NOUN}))s?\b(?!\s+(?:commission|team|staff|department|committee|board))|approv(?:ing|al)\s+(?:of|the|this|it|that)\b)`;
 // Strict item object for "urge ... to approve X": no modifiers, so "the other item" is not the item.
 const ITEM = String.raw`(?:it\b|this${ALONE}|that${ALONE}|(?:the|this)\s+(?:${NOUN})s?\b)`;
 const OF_FOR = String.raw`(?:\s+(?:of|for))?`;

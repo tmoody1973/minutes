@@ -118,3 +118,12 @@ describe("extractCues: Ruling 14 amendments", () => {
     expect(run(a, ...far)).toEqual([]);
   });
 });
+
+describe("filler-only prefix (no backtracking)", () => {
+  it("40 fillers followed by a non-filler returns quickly", () => {
+    const text = "okay ".repeat(40) + "Commissioner Smith!";
+    const start = Date.now();
+    extractCues([t("c0:A", text), t("c0:B", "Present.")]);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+});

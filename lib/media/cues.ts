@@ -5,7 +5,7 @@ import type { Cue, Turn } from "@/lib/types";
 const LEAD_IN = /^(?:(?:good (?:afternoon|morning|evening)|hello|hi|yes|thank you|um|uh)\b(?:\s+(?:everyone|all)\b)?[\s,.!]*)+/i;
 const HON_WORDS = "Commissioner|Alderman|Alderwoman|Alderperson|Ald\\.?|Ms\\.?|Mr\\.?|Mrs\\.?|Dr\\.?";
 const LEADING_HON = new RegExp(`^(?:${HON_WORDS})\\s+`, "i");
-const FILLERS_ONLY = /^(?:\s*(?:okay|ok|um|uh|so|and|next|all right|alright|yes)\b[\s,.]*)*$/i;
+const FILLERS_ONLY = /^(?:(?:okay|ok|um|uh|so|and|next|all right|alright|yes)\b[\s,.]*)*$/i;
 const TITLES = new Set(["chair", "chairman", "chairwoman", "chairperson", "president", "vice", "madam", "mister", "sir", "commissioner", "alderman", "alderwoman", "alderperson", "ald", "ms", "mr", "mrs", "dr"]);
 const badNameWord = (w: string) => TITLES.has(w.toLowerCase().replace(/\.$/, ""));
 const HONORIFIC = new RegExp(`\\b(?:${HON_WORDS})\\s+`, "gi");
