@@ -3,6 +3,19 @@ import type { EventItemRecord, EventRecord, HistoryRecord, MatterRecord, VoteRec
 // Legistar rows are loosely typed JSON; each parser reads only the fields it needs.
 type Raw = Record<string, unknown>;
 
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+// HTML -> plain text: tags out, entities decoded, whitespace collapsed; undefined when nothing is left.
+function plainText(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v
+    .replace(/<\/(p|div|li|br)>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) =>
+      e[0] === "#" ? String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENTITIES[e.toLowerCase()] ?? m)
+    .replace(/\s+/g, " ")
+    .trim();
+  return t || undefined;
+}
 const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined);
 const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
 const passedFlag = (v: unknown): boolean | undefined =>
@@ -69,6 +82,7 @@ export function parseEventItem(raw: Raw): EventItemRecord {
     videoStartSec: num(raw.EventItemVideoIndex),
     mover: str(raw.EventItemMover),
     seconder: str(raw.EventItemSeconder),
+    minutesNote: plainText(raw.EventItemMinutesNote),
   };
 }
 

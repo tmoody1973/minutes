@@ -73,7 +73,7 @@ export const syncEvent = internalAction({
   args: { eventId: v.number() },
   handler: async (ctx, { eventId }) => {
     await recorded(ctx, "child", `syncEvent ${eventId}`, async (c) => {
-      const items = (await legistarGet<Raw[]>(`events/${eventId}/eventitems`)).map(parseEventItem);
+      const items = (await legistarGet<Raw[]>(`events/${eventId}/eventitems`, { MinutesNote: "1" })).map(parseEventItem);
       for (const item of items) {
         await c.attempt(`item ${item.legistarId}`, async () => {
           await ctx.runMutation(internal.legistar.upsertEventItem, item);

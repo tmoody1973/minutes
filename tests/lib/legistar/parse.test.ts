@@ -66,6 +66,15 @@ describe("parseEventItem", () => {
     expect(it.actionName).toContain("RECOMMENDED FOR");
   });
 
+  it("turns MinutesNote HTML into plain text", () => {
+    const base = items[0];
+    const note = (n: unknown) => parseEventItem({ ...base, EventItemMinutesNote: n }).minutesNote;
+    expect(note("<p>Appearing: Brian Emrich, Allegro Civil Engineers</p>")).toBe("Appearing: Brian Emrich, Allegro Civil Engineers");
+    expect(note("<p>A &amp; B</p>\r\n<p>Mr.&nbsp;Salata  &#8211; ok</p>")).toBe("A & B Mr. Salata \u2013 ok");
+    expect(note(null)).toBeUndefined();
+    expect(note("<p> </p>")).toBeUndefined();
+  });
+
   it("parses an agenda header with no matter", () => {
     const header = parseEventItem(items.find((i) => i.EventItemId === 495633)!);
     expect(header.matterId).toBeUndefined();
