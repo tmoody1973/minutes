@@ -113,3 +113,12 @@ describe("displayable", () => {
   it("returns the plain line once approved", () => expect(displayable({ ...base, approved: true })).toBe("A plain line."));
   it("returns null for a missing entry", () => expect(displayable(undefined)).toBeNull());
 });
+
+describe("lookup by district name (Ruling 40)", () => {
+  it("resolves the from/to strings of the Bookends title by entry term, case-insensitively", () => {
+    expect(lookup("General Planned Development")?.term).toBe("General Planned Development");
+    expect(lookup("Detailed Planned Development")?.term).toBe("Detailed Planned Development");
+    expect(lookup("detailed planned development")?.code).toBe("DPD");
+    expect(lookup("Not A District")).toBeNull();
+  });
+});

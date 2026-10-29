@@ -20,7 +20,9 @@ export interface GlossaryLookup {
 
 /** Pure lookup over any entry table (exported so tests can pass an approved copy). */
 export function lookupIn(entries: Readonly<Record<string, GlossaryEntry>>, codeOrTerm: string): GlossaryLookup | null {
-  const e = Object.hasOwn(entries, codeOrTerm) ? entries[codeOrTerm] : undefined;
+  // Exact key first ("RT4", "special use"), then the district name as titles spell it ("General Planned Development").
+  const lower = codeOrTerm.toLowerCase();
+  const e = Object.hasOwn(entries, codeOrTerm) ? entries[codeOrTerm] : Object.values(entries).find((x) => x.term.toLowerCase() === lower);
   if (!e) return null;
   return { term: e.term, code: e.code, plain: displayable(e), officialText: e.officialText, officialUrl: e.officialUrl, section: e.section };
 }
