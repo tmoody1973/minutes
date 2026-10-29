@@ -68,7 +68,7 @@ describe("buildTimeline", () => {
       buildTimeline(matter, histories(74560), [...items, i], [...events, council], new Map(), NOW);
     const last = run(future).at(-1)!;
     expect(last).toMatchObject({ body: "Common Council", date: "2026-11-08", actions: ["SCHEDULED"], upcoming: true, eventId: 20001, eventItemId: 900001 });
-    expect(run({ ...future, removedAt: 1 } as EventItemRecord).every((s) => !s.upcoming)).toBe(true);
+    expect(run({ ...future, removedAt: 1 }).every((s) => !s.upcoming)).toBe(true);
   });
 
   it("suppresses an upcoming step when history already has that body and date", () => {
@@ -78,5 +78,62 @@ describe("buildTimeline", () => {
     const steps = buildTimeline(matter, hist, [item(900002, 20002, 74560)], [znd], new Map(), NOW);
     expect(steps.filter((s) => s.date === "2026-10-30")).toHaveLength(1);
     expect(steps.every((s) => !s.upcoming)).toBe(true);
+  });
+
+  it("leaves passed undefined when merged rows disagree, keeping actions in order", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const base = histories(74560)[0];
+    const row = (id: number, actionName: string, passed: boolean) =>
+      ({ ...base, legistarId: id, bodyName: "CITY PLAN COMMISSION", date: "2026-09-28T00:00:00", actionName, passed, eventId: undefined });
+    const steps = buildTimeline(matter, [row(1, "A", true), row(2, "B", false)], [], [], new Map(), NOW);
+    expect(steps).toHaveLength(1);
+    expect(steps[0].actions).toEqual(["A", "B"]);
+    expect(steps[0].passed).toBeUndefined();
+    const agree = buildTimeline(matter, [row(1, "A", true), row(2, "B", true)], [], [], new Map(), NOW);
+    expect(agree[0].passed).toBe(true);
+  });
+
+  it("never attaches a removed item to a history step", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const removed = items.map((i) => (i.matterId === 74560 ? { ...i, removedAt: 1 } : i));
+    const steps = buildTimeline(matter, histories(74560), removed, events, new Map([[495640, { aye: 1, no: 0, excused: 0, other: 0 }]]), NOW);
+    const cpc = steps.find((s) => s.body === "City Plan Commission")!;
+    expect(cpc.eventItemId).toBeUndefined();
+    expect(cpc.videoStartSec).toBeUndefined();
+    expect(cpc.tally).toBeUndefined();
+  });
+
+  it("fills event link from a later merged row when the first lacks one", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const [h] = histories(74560);
+    const rows = [
+      { ...h, legistarId: 1, bodyName: "CITY PLAN COMMISSION", date: "2026-09-28T00:00:00", eventId: undefined },
+      { ...h, legistarId: 2, bodyName: "CITY PLAN COMMISSION", date: "2026-09-28T00:00:00", eventId: 13559 },
+    ];
+    const [s] = buildTimeline(matter, rows, items, events, new Map(), NOW);
+    expect(s).toMatchObject({ eventId: 13559, eventItemId: 495640, videoStartSec: 2051 });
+  });
+
+  it("prefers the sequenced item for an upcoming step", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const council = ev(20003, 1, "COMMON COUNCIL", "2026-11-08T09:00:00-06:00");
+    const its = [item(1, 20003, 74560, { sequence: null }), item(2, 20003, 74560, { sequence: 4 })];
+    const last = buildTimeline(matter, [], its, [council], new Map(), NOW).at(-1)!;
+    expect(last.eventItemId).toBe(2);
+  });
+
+  it("orders same-date CPC before ZND even when history lists them reversed", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const [h] = histories(74560);
+    const mk = (id: number, bodyName: string) => ({ ...h, legistarId: id, bodyName, date: "2026-09-28T00:00:00", eventId: undefined });
+    const steps = buildTimeline(matter, [mk(1, "ZONING, NEIGHBORHOODS & DEVELOPMENT COMMITTEE"), mk(2, "CITY PLAN COMMISSION")], [], [], new Map(), NOW);
+    expect(steps.map((s) => s.body)).toEqual(["City Plan Commission", "Zoning, Neighborhoods & Development"]);
+  });
+
+  it("ignores upcoming items for another matter", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const council = ev(20004, 1, "COMMON COUNCIL", "2026-11-08T09:00:00-06:00");
+    const steps = buildTimeline(matter, [], [item(5, 20004, 99999)], [council], new Map(), NOW);
+    expect(steps).toEqual([]);
   });
 });

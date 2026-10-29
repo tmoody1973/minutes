@@ -11,7 +11,22 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\w)/g, (_, a
 const label = (name: string) => LABELS.get(name.trim().toUpperCase()) ?? titleCase(name.trim());
 const day = (iso: string) => iso.slice(0, 10);
 
-type StoredItem = EventItemRecord & { removedAt?: number };
+// Same-date tie-break: CPC < ZND < Council < Mayor; Council rows keep history order (stable sort).
+const RANK = new Map([["City Plan Commission", 0], ["Zoning, Neighborhoods & Development", 1], ["Common Council", 2], ["Mayor", 3]]);
+const rank = (body: string) => RANK.get(body) ?? 2;
+
+// Prefer the agenda row (non-null sequence) over minutes-only duplicates.
+const pick = (rows: EventItemRecord[]) => rows.find((i) => i.sequence !== null) ?? rows[0];
+
+function link(it: EventItemRecord | undefined, tallies: Map<number, Tally>): Partial<TimelineStep> {
+  if (!it) return {};
+  const tally = tallies.get(it.legistarId);
+  return {
+    eventItemId: it.legistarId,
+    ...(it.videoStartSec !== undefined && { videoStartSec: it.videoStartSec }),
+    ...(tally && { tally }),
+  };
+}
 
 // Pure: steps come only from stored Legistar history rows plus future agenda items (Ruling 28).
 export function buildTimeline(
@@ -24,48 +39,45 @@ export function buildTimeline(
 ): TimelineStep[] {
   const steps: TimelineStep[] = [];
   const byKey = new Map<string, TimelineStep>();
+  const outcomes = new Map<TimelineStep, Set<boolean>>();
+  const live = items.filter((i) => !i.removedAt);
 
-  const rows = histories.filter((h) => h.bodyName.trim().toUpperCase() !== "CITY CLERK");
-  for (const h of rows) {
+  for (const h of histories.filter((r) => r.bodyName.trim().toUpperCase() !== "CITY CLERK")) {
     const body = label(h.bodyName);
     const date = day(h.date);
     const key = `${body}|${date}`;
-    const existing = byKey.get(key);
-    if (existing) {
-      existing.actions.push(h.actionName);
-      if (h.passed !== undefined) existing.passed = h.passed;
-      continue;
+    const it = h.eventId === undefined ? undefined
+      : pick(live.filter((i) => i.eventId === h.eventId && i.matterId === h.matterId));
+    let step = byKey.get(key);
+    if (step) {
+      step.actions.push(h.actionName);
+      if (step.eventId === undefined && h.eventId !== undefined) Object.assign(step, { eventId: h.eventId });
+      if (step.eventItemId === undefined) Object.assign(step, link(it, tallies));
+    } else {
+      step = { body, date, actions: [h.actionName], ...(h.eventId !== undefined && { eventId: h.eventId }), ...link(it, tallies), upcoming: false };
+      byKey.set(key, step);
+      outcomes.set(step, new Set());
+      steps.push(step);
     }
-    // Prefer the agenda row (non-null sequence) over minutes-only duplicates.
-    const matches = items.filter((i) => h.eventId !== undefined && i.eventId === h.eventId && i.matterId === h.matterId);
-    const it = matches.find((i) => i.sequence !== null) ?? matches[0];
-    const step: TimelineStep = {
-      body,
-      date,
-      actions: [h.actionName],
-      ...(h.passed !== undefined && { passed: h.passed }),
-      ...(h.eventId !== undefined && { eventId: h.eventId }),
-      ...(it && { eventItemId: it.legistarId }),
-      ...(it?.videoStartSec !== undefined && { videoStartSec: it.videoStartSec }),
-      ...(it && tallies.has(it.legistarId) && { tally: tallies.get(it.legistarId) }),
-      upcoming: false,
-    };
-    byKey.set(key, step);
-    steps.push(step);
+    if (h.passed !== undefined) outcomes.get(step)!.add(h.passed);
   }
+  // Rows that disagree must not be summarized as one outcome.
+  for (const [step, seen] of outcomes) if (seen.size === 1) step.passed = [...seen][0];
 
   const eventById = new Map(events.map((e) => [e.legistarId, e]));
-  for (const i of items as StoredItem[]) {
-    const ev = eventById.get(i.eventId);
-    if (!ev || i.removedAt || i.matterId !== matter.legistarId || new Date(ev.startsAt) <= now) continue;
+  const future = live.filter((i) => i.matterId === matter.legistarId && new Date(eventById.get(i.eventId)?.startsAt ?? 0) > now);
+  const byEvent = new Map<number, EventItemRecord[]>();
+  for (const i of future) byEvent.set(i.eventId, [...(byEvent.get(i.eventId) ?? []), i]);
+  for (const [eventId, rows] of byEvent) {
+    const ev = eventById.get(eventId)!;
     const body = label(ev.bodyName);
     const date = day(ev.startsAt);
     if (byKey.has(`${body}|${date}`)) continue;
-    const step: TimelineStep = { body, date, actions: ["SCHEDULED"], eventId: ev.legistarId, eventItemId: i.legistarId, upcoming: true };
+    const step: TimelineStep = { body, date, actions: ["SCHEDULED"], eventId, eventItemId: pick(rows).legistarId, upcoming: true };
     byKey.set(`${body}|${date}`, step);
     steps.push(step);
   }
 
-  // Array.prototype.sort is stable, so same-date ties keep Legistar's order.
-  return steps.sort((a, b) => a.date.localeCompare(b.date));
+  // Array.prototype.sort is stable, so equal date+rank keeps Legistar's order.
+  return steps.sort((a, b) => a.date.localeCompare(b.date) || rank(a.body) - rank(b.body));
 }

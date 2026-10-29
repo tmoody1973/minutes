@@ -6,7 +6,7 @@ import type { Chapter, Cue, ChapterPart, EventItemRecord, SpeakerAssignment, Tur
 // Deterministic first: chapter boundaries come from Legistar video indexes or a spoken cue, never from a model.
 // The Chapterer agent only proposes parts inside a chapter, and validateParts accepts or rejects them whole.
 
-type ChapterItem = EventItemRecord & { removedAt?: number };
+type ChapterItem = EventItemRecord;
 
 // Ruling 18: sequenced, not removed, and either a matter or a video index.
 const chapterable = (i: ChapterItem) => i.sequence !== null && !i.removedAt && (i.matterId !== undefined || i.videoStartSec !== undefined);
