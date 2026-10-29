@@ -1,0 +1,93 @@
+[
+    {
+        "VoteId": 1249414,
+        "VoteGuid": "C8B11D2E-101D-4CAB-9915-8B24845210F8",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.457",
+        "VoteRowVersion": "AAAAAAOP6xc=",
+        "VotePersonId": 1200,
+        "VotePersonName": "Allyson Nemec",
+        "VoteValueId": 1,
+        "VoteValueName": "Aye",
+        "VoteSort": 1,
+        "VoteResult": 1,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249415,
+        "VoteGuid": "8669E698-A151-4A34-9FA4-7F2E009A1034",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.457",
+        "VoteRowVersion": "AAAAAAOP6xg=",
+        "VotePersonId": 3877,
+        "VotePersonName": "Jesus Gonzalez",
+        "VoteValueId": 1,
+        "VoteValueName": "Aye",
+        "VoteSort": 2,
+        "VoteResult": 1,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249416,
+        "VoteGuid": "115CF0EE-BE0C-4883-9823-0DCEE3BBEA2F",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.457",
+        "VoteRowVersion": "AAAAAAOP6xk=",
+        "VotePersonId": 3030,
+        "VotePersonName": "Ranell Washington",
+        "VoteValueId": 1,
+        "VoteValueName": "Aye",
+        "VoteSort": 3,
+        "VoteResult": 1,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249417,
+        "VoteGuid": "29BE0CDA-5034-466D-BA1C-CD68EAEC4705",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.46",
+        "VoteRowVersion": "AAAAAAOP6xM=",
+        "VotePersonId": 2059,
+        "VotePersonName": "Stephanie Bloomingdale",
+        "VoteValueId": 6,
+        "VoteValueName": "Excused",
+        "VoteSort": 4,
+        "VoteResult": 0,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249418,
+        "VoteGuid": "DADE9811-B98C-471C-A0B4-CF517C4FC40E",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.46",
+        "VoteRowVersion": "AAAAAAOP6xo=",
+        "VotePersonId": 3472,
+        "VotePersonName": "Tarik Moody",
+        "VoteValueId": 1,
+        "VoteValueName": "Aye",
+        "VoteSort": 5,
+        "VoteResult": 1,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249419,
+        "VoteGuid": "5C1FD9B2-78A1-4CDE-9267-EF114460DBDB",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.46",
+        "VoteRowVersion": "AAAAAAOP6xs=",
+        "VotePersonId": 3080,
+        "VotePersonName": "Willie Smith",
+        "VoteValueId": 1,
+        "VoteValueName": "Aye",
+        "VoteSort": 6,
+        "VoteResult": 1,
+        "VoteEventItemId": 495638
+    },
+    {
+        "VoteId": 1249420,
+        "VoteGuid": "7877251A-13D1-420E-AED3-28AB4A69A372",
+        "VoteLastModifiedUtc": "2026-09-29T13:26:44.46",
+        "VoteRowVersion": "AAAAAAOP6xY=",
+        "VotePersonId": 3338,
+        "VotePersonName": "Catrina Crane",
+        "VoteValueId": 6,
+        "VoteValueName": "Excused",
+        "VoteSort": 7,
+        "VoteResult": 0,
+        "VoteEventItemId": 495638
+    }
+]
