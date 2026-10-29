@@ -3,6 +3,27 @@ import type { EventItemRecord, EventRecord, HistoryRecord, MatterRecord, VoteRec
 // Legistar rows are loosely typed JSON; each parser reads only the fields it needs.
 type Raw = Record<string, unknown>;
 
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c", ndash: "\u2013", mdash: "\u2014", hellip: "\u2026",
+  eacute: "\u00e9", egrave: "\u00e8", aacute: "\u00e1", iacute: "\u00ed", oacute: "\u00f3", uacute: "\u00fa",
+  ntilde: "\u00f1", uuml: "\u00fc", ouml: "\u00f6", ccedil: "\u00e7" };
+// Unknown entities and invalid code points (0, surrogates, > 0x10FFFF) stay as written; a bad note must never throw.
+function decodeEntity(m: string, e: string): string {
+  if (e[0] !== "#") return ENTITIES[e] ?? m;
+  const cp = e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+  return cp > 0 && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff) ? String.fromCodePoint(cp) : m;
+}
+// HTML -> plain text: tags out, entities decoded, whitespace collapsed; undefined when nothing is left.
+function plainText(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v
+    .replace(/<\/(p|div|li|br)>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decodeEntity)
+    .replace(/\s+/g, " ")
+    .trim();
+  return t || undefined;
+}
 const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined);
 const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
 const passedFlag = (v: unknown): boolean | undefined =>
@@ -69,6 +90,7 @@ export function parseEventItem(raw: Raw): EventItemRecord {
     videoStartSec: num(raw.EventItemVideoIndex),
     mover: str(raw.EventItemMover),
     seconder: str(raw.EventItemSeconder),
+    minutesNote: plainText(raw.EventItemMinutesNote),
   };
 }
 

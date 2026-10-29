@@ -9,7 +9,7 @@ type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "person
 // fields written by other mutations (eventItems.tally).
 const CLEARABLE: Record<LegistarTable, string[]> = {
   events: ["clipId", "agendaUrl", "minutesUrl", "insiteUrl"],
-  eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder", "removedAt"],
+  eventItems: ["matterId", "fileNumber", "actionName", "passed", "videoStartSec", "mover", "seconder", "minutesNote", "removedAt"],
   matters: ["introDate", "attachments"],
   histories: ["passed", "eventId"],
   persons: [],
@@ -74,6 +74,7 @@ export const upsertEventItem = internalMutation({
     videoStartSec: v.optional(v.number()),
     mover: v.optional(v.string()),
     seconder: v.optional(v.string()),
+    minutesNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const r = await upsert(ctx, "eventItems", args);

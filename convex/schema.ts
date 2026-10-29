@@ -28,6 +28,7 @@ export default defineSchema({
     videoStartSec: v.optional(v.number()),
     mover: v.optional(v.string()),
     seconder: v.optional(v.string()),
+    minutesNote: v.optional(v.string()),
     tally: v.optional(tallyV),
     // ms timestamp when upstream stopped listing this item on the agenda; cleared if it reappears.
     removedAt: v.optional(v.number()),

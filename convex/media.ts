@@ -180,6 +180,24 @@ export const overridesForEvent = internalQuery({
   },
 });
 
+// Everything `speakers.ts list` needs beside the turns: the event's clip, its chapters, and each chapter item's official text.
+export const reviewContext = internalQuery({
+  args: { eventId: v.number() },
+  handler: async (ctx, { eventId }) => {
+    const event = await ctx.db.query("events").withIndex("by_legistarId", (q) => q.eq("legistarId", eventId)).unique();
+    const items = await ctx.db.query("eventItems").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
+    const byId = new Map(items.map((i) => [i.legistarId, i]));
+    const chapters = await ctx.db.query("chapters").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
+    return {
+      clipId: event?.clipId ?? null,
+      chapters: chapters.map((c) => {
+        const i = byId.get(c.eventItemId);
+        return { eventItemId: c.eventItemId, startMs: c.startMs ?? null, endMs: c.endMs ?? null, located: c.located, fileNumber: i?.fileNumber, title: i?.title.slice(0, 60).trimEnd(), minutesNote: i?.minutesNote };
+      }),
+    };
+  },
+});
+
 // ---- public read ----
 
 // Read-only. Overrides apply here (as manual assignments); their `by` field is never returned.

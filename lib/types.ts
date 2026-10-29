@@ -1,6 +1,6 @@
 export type BodyKey = "council" | "cpc" | "znd";        // Legistar BodyId 1, 272, 11
 export interface EventRecord { legistarId: number; bodyId: number; bodyName: string; startsAt: string /* ISO, America/Chicago */; clipId?: number; agendaUrl?: string; minutesUrl?: string; insiteUrl?: string }
-export interface EventItemRecord { legistarId: number; eventId: number; sequence: number | null; matterId?: number; fileNumber?: string; title: string; actionName?: string; passed?: boolean; videoStartSec?: number; mover?: string; seconder?: string }
+export interface EventItemRecord { legistarId: number; eventId: number; sequence: number | null; matterId?: number; fileNumber?: string; title: string; actionName?: string; passed?: boolean; videoStartSec?: number; mover?: string; seconder?: string; minutesNote?: string }
 export interface MatterRecord { legistarId: number; fileNumber: string; title: string; typeName: string; statusName: string; introDate?: string }
 export interface HistoryRecord { legistarId: number; matterId: number; date: string; bodyName: string; actionName: string; passed?: boolean; eventId?: number }
 export interface VoteRecord { eventItemId: number; personId: number; personName: string; value: string }
