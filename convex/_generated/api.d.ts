@@ -10,6 +10,7 @@
 
 import type * as crons from "../crons.js";
 import type * as legistar from "../legistar.js";
+import type * as locations from "../locations.js";
 import type * as media from "../media.js";
 import type * as near from "../near.js";
 import type * as sync from "../sync.js";
@@ -23,6 +24,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   legistar: typeof legistar;
+  locations: typeof locations;
   media: typeof media;
   near: typeof near;
   sync: typeof sync;

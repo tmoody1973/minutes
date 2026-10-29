@@ -63,6 +63,20 @@ export default defineSchema({
     // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
     parcels: v.optional(v.array(parcelV)),
   }).index("by_legistarId", ["legistarId"]),
+  // Slim read model for near-me: one row per zoning-kind matter that has at least one parcel centroid.
+  // Maintained by upsertMatter / setMatterParcels (convex/locations.ts); no polygons, so reads stay small.
+  matterLocations: defineTable({
+    matterId: v.number(),
+    fileNumber: v.string(),
+    title: v.string(),
+    kind: v.string(),
+    statusName: v.string(),
+    centroids: v.array(v.object({ lat: v.number(), lng: v.number() })),
+  })
+    .index("by_kind", ["kind"])
+    .index("by_matter", ["matterId"]),
+  // Global fixed-window counters (key = what is limited).
+  rateLimits: defineTable({ key: v.string(), windowStart: v.number(), count: v.number() }).index("by_key", ["key"]),
   histories: defineTable({
     legistarId: v.number(),
     matterId: v.number(),

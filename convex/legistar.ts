@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { parcelV, tallyV } from "./schema";
+import { syncMatterLocation } from "./locations";
 
 type Upserted = { inserted: boolean; changedFields: string[] };
 type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "persons";
@@ -116,7 +117,11 @@ export const upsertMatter = internalMutation({
     introDate: v.optional(v.string()),
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
   },
-  handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
+  handler: async (ctx, args) => {
+    const r = out(await upsert(ctx, "matters", args));
+    await syncMatterLocation(ctx, args.legistarId);
+    return r;
+  },
 });
 
 // parcels has its own writer: it is not in CLEARABLE, so a matter upsert that doesn't carry it leaves it alone.
@@ -126,6 +131,7 @@ export const setMatterParcels = internalMutation({
   handler: async (ctx, { matterId, parcels }) => {
     const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
     if (row) await ctx.db.patch(row._id, { parcels });
+    await syncMatterLocation(ctx, matterId);
   },
 });
 

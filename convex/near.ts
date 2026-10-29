@@ -1,25 +1,49 @@
 import { v } from "convex/values";
-import { action, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { action, internalMutation, query } from "./_generated/server";
+import { NEAR_KINDS } from "./locations";
 import { distanceMiles, geocodeUserAddress } from "../lib/geo/near";
-import { parseZoningChange } from "../lib/zoning/change";
 
-const KINDS = new Set(["rezoning", "dpd-amendment", "minor-modification"]);
 // Legistar statusName values that mean the file is finished. Real dev values seen: "Passed", "Placed On File",
 // "In Council-Placed on File". Pending council steps ("In Council-Adoption"), "Confirmed" and "Dead" are NOT listed:
 // they appear under "all" only.
 const DECIDED_RE = /^(?:in council-)?(?:passed|adopted|approved|failed|placed on file)$/i;
 const MAX_ROWS = 100;
 
-// Public: geocodes a typed address. Not logged. Anyone can call it, so it spends our Census goodwill;
-// add a rate limit before launch (Convex has no built-in per-IP limit).
-export const geocode = action({
-  args: { text: v.string() },
-  handler: async (_ctx, { text }) => geocodeUserAddress(text),
+const GEOCODE_LIMIT = 60;
+const WINDOW_MS = 60_000;
+
+// Global fixed window (not per user: the action has no caller identity). Returns false when the window is spent.
+export const takeGeocodeToken = internalMutation({
+  args: { now: v.optional(v.number()) },
+  handler: async (ctx, { now = Date.now() }) => {
+    const windowStart = Math.floor(now / WINDOW_MS) * WINDOW_MS;
+    const row = await ctx.db.query("rateLimits").withIndex("by_key", (q) => q.eq("key", "geocode")).unique();
+    if (!row) {
+      await ctx.db.insert("rateLimits", { key: "geocode", windowStart, count: 1 });
+      return true;
+    }
+    if (row.windowStart < windowStart) {
+      await ctx.db.patch(row._id, { windowStart, count: 1 });
+      return true;
+    }
+    if (row.count >= GEOCODE_LIMIT) return false;
+    await ctx.db.patch(row._id, { count: row.count + 1 });
+    return true;
+  },
 });
 
-// Public, read-only. Scans every matter once (~1,000 today, O(n)); the only per-row lookups are indexed reads for
-// matters already inside the radius. Ceiling: each matter row carries its parcel polygons, so this reads all of
-// them; if the table grows past a few thousand, store a centroid-only side table.
+// Public: geocodes a typed address (never logged), at most 60 per minute across all callers; over that -> "busy".
+export const geocode = action({
+  args: { text: v.string() },
+  handler: async (ctx, { text }) => {
+    if (!(await ctx.runMutation(internal.near.takeGeocodeToken, {}))) return { error: "busy" as const };
+    return geocodeUserAddress(text);
+  },
+});
+
+// Public, read-only. Reads only matterLocations rows of the three zoning kinds (slim: centroids, no polygons; never
+// the matters table), then indexed event lookups for rows already inside the radius. Capped at 100 rows.
 export const filesNear = query({
   args: {
     lat: v.number(),
@@ -33,12 +57,11 @@ export const filesNear = query({
     if (!(radiusMi > 0 && radiusMi <= 5)) throw new Error("radiusMi must be greater than 0 and at most 5");
     const here = { lat, lng };
     const near = [];
-    for (const m of await ctx.db.query("matters").collect()) {
-      if (!m.parcels?.length || !KINDS.has(parseZoningChange(m.title).kind)) continue;
-      const ds = m.parcels.flatMap((p) => (p.centroid ? [distanceMiles(here, p.centroid)] : []));
-      if (!ds.length) continue;
-      const d = Math.min(...ds);
-      if (d <= radiusMi) near.push({ m, d });
+    for (const kind of NEAR_KINDS) {
+      for (const m of await ctx.db.query("matterLocations").withIndex("by_kind", (q) => q.eq("kind", kind)).collect()) {
+        const d = Math.min(...m.centroids.map((c) => distanceMiles(here, c)));
+        if (d <= radiusMi) near.push({ m, d });
+      }
     }
     near.sort((a, b) => a.d - b.d);
     const now = Date.now();
@@ -46,7 +69,7 @@ export const filesNear = query({
     for (const { m, d } of near) {
       if (filter === "decided" && !DECIDED_RE.test(m.statusName)) continue;
       let next: { date: string; body: string; eventId: number; at: number } | undefined;
-      for (const it of await ctx.db.query("eventItems").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect()) {
+      for (const it of await ctx.db.query("eventItems").withIndex("by_matter", (q) => q.eq("matterId", m.matterId)).collect()) {
         if (it.removedAt !== undefined) continue;
         const ev = await ctx.db.query("events").withIndex("by_legistarId", (q) => q.eq("legistarId", it.eventId)).unique();
         const at = ev ? Date.parse(ev.startsAt) : NaN;
@@ -54,7 +77,7 @@ export const filesNear = query({
       }
       if (filter === "upcoming" && !next) continue;
       rows.push({
-        matterId: m.legistarId,
+        matterId: m.matterId,
         fileNumber: m.fileNumber,
         title: m.title,
         statusName: m.statusName,
