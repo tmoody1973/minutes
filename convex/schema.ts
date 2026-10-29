@@ -100,7 +100,7 @@ export default defineSchema({
     evidenceTurnKey: v.string(),
   }).index("by_event", ["eventId"]),
   // Human decisions: never touched by ingest.
-  speakerOverrides: defineTable({ eventId: v.number(), label: v.string(), name: v.string(), by: v.string(), at: v.number() }).index(
+  speakerOverrides: defineTable({ eventId: v.number(), label: v.string(), name: v.string(), hidden: v.optional(v.boolean()), by: v.string(), at: v.number() }).index(
     "by_event_label",
     ["eventId", "label"],
   ),

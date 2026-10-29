@@ -1,5 +1,6 @@
 // Usage: npx tsx scripts/ingest-meeting.ts <eventId> [--reconfirm | --reparts]
 //   --reconfirm  re-ask Muse Spark for speaker confirmations AND chapter parts
+//   --captions   allow captions to replace stored transcript turns when data/transcripts/<id> is missing
 //   --reparts    refresh chapter parts only; stored speaker confirmations are still reused
 // NOTE: turns, speaker assignments and chapters are written by SEPARATE mutations (not one transaction).
 // A run that fails midway can leave an event mixed (e.g. new turns with old assignments or chapters).
@@ -9,7 +10,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { alignChapters, proposeParts } from "../lib/media/chapters";
 import { extractCues } from "../lib/media/cues";
-import { batchBySize, candidateKey, chunkFiles, namesFingerprint, outageRow, partsDecision, reuseOrCall } from "../lib/media/ingest";
+import { assertCaptionsAllowed, batchBySize, candidateKey, chunkFiles, namesFingerprint, outageRow, partsDecision, partsNames, reuseOrCall } from "../lib/media/ingest";
 import { assignFromCues, confirmAssignments, nameSpeakers, validateAssignment, type RosterEntry } from "../lib/media/speakers";
 import { stitchChunks } from "../lib/media/stitch";
 import { parseVtt } from "../lib/media/vtt";
@@ -35,12 +36,13 @@ const counted = (async (...a: Parameters<typeof sparkJSON>) => {
   }
 }) as typeof sparkJSON;
 
-async function loadTurns(eventId: number, clipId: number | null): Promise<{ turns: Turn[]; source: "transcript" | "captions" }> {
+async function loadTurns(eventId: number, clipId: number | null, allowCaptions: boolean): Promise<{ turns: Turn[]; source: "transcript" | "captions" }> {
   const dir = `data/transcripts/${eventId}`;
   if (existsSync(dir)) {
     const chunks = chunkFiles(readdirSync(dir), dir).map((f) => JSON.parse(readFileSync(`${dir}/${f}`, "utf8")));
     return { turns: stitchChunks(eventId, chunks), source: "transcript" };
   }
+  assertCaptionsAllowed(eventId, convexRun<"transcript" | "captions" | "none">("media:sourceForEvent", { eventId }), allowCaptions);
   if (clipId === null) throw new Error(`event ${eventId}: no local transcript and no clipId for captions`);
   const url = `https://milwaukee.granicus.com/videos/${clipId}/captions.vtt`;
   const res = await fetch(url, { headers: { "User-Agent": UA } });
@@ -90,9 +92,8 @@ async function chapterStep(eventId: number, turns: Turn[], assignments: SpeakerA
   const meetingEnd = Math.max(0, ...turns.map((t) => t.endMs));
   const aligned = alignChapters(items, turns, meetingEnd);
   const prior = new Map(convexRun<StoredChapter[]>("media:chaptersForEvent", { eventId }).map((c) => [c.eventItemId, c]));
-  const overrides = convexRun<{ label: string; name: string; at: number }[]>("media:overridesForEvent", { eventId });
-  const forParts = [...assignments, ...overrides.map((o) => ({ label: o.label, name: o.name, source: "manual" as const, evidenceTurnKey: "", at: o.at }))];
-  const fingerprint = namesFingerprint(forParts);
+  const overrides = convexRun<{ label: string; name: string; hidden?: boolean; at: number }[]>("media:overridesForEvent", { eventId });
+  const { forParts, fingerprint } = partsNames(assignments, overrides);
   const rows: StoredChapter[] = [];
   for (const c of aligned) {
     const base: StoredChapter = { eventItemId: c.eventItemId, located: c.located, parts: [], ...(c.startMs !== null ? { startMs: c.startMs } : {}), ...(c.endMs !== null ? { endMs: c.endMs } : {}) };
@@ -121,11 +122,11 @@ async function main() {
   const reconfirm = args.includes("--reconfirm");
   const reparts = args.includes("--reparts");
   const eventId = Number(args.find((a) => !a.startsWith("--")));
-  if (!eventId) throw new Error("usage: ingest-meeting.ts <eventId> [--reconfirm] [--reparts]");
+  if (!eventId) throw new Error("usage: ingest-meeting.ts <eventId> [--reconfirm] [--reparts] [--captions]");
   const ev = convexRun<{ bodyId: number; clipId: number | null } | null>("media:eventByLegistarId", { legistarId: eventId });
   if (!ev) throw new Error(`event ${eventId} not found in Convex`);
 
-  const { turns, source } = await loadTurns(eventId, ev.clipId);
+  const { turns, source } = await loadTurns(eventId, ev.clipId, args.includes("--captions"));
   const stale = await writeTurns(eventId, turns, source);
   let assignments: SpeakerAssignment[] = [];
   let reused = 0;
@@ -134,7 +135,8 @@ async function main() {
   else convexRun("media:replaceAssignments", { eventId, assignments: [] });
   const chapters = await chapterStep(eventId, turns, assignments, source === "transcript", reconfirm, reparts);
 
-  const named = nameSpeakers(turns, assignments).filter((n) => !/^(Speaker |Unidentified)/.test(n.display)).length;
+  const hiddenLabels = convexRun<{ label: string; hidden?: boolean }[]>("media:overridesForEvent", { eventId }).filter((o) => o.hidden).map((o) => o.label);
+  const named = nameSpeakers(turns, assignments, hiddenLabels).filter((n) => !/^(Speaker |Unidentified)/.test(n.display)).length;
   const located = chapters.filter((c) => c.located !== "not-located").length;
   console.log(
     `event ${eventId} [${source}]: turns ${turns.length} (stale removed ${stale}), named ${named}/${turns.length} (${turns.length ? ((100 * named) / turns.length).toFixed(1) : 0}%), ` +

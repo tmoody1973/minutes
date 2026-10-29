@@ -54,11 +54,15 @@ export const upsertTurns = internalMutation({
 export const removeTurns = internalMutation({
   args: { eventId: v.number(), turnKeys: v.array(v.string()) },
   handler: async (ctx, { eventId, turnKeys }) => {
+    let removed = 0;
     for (const k of turnKeys) {
       const row = await ctx.db.query("turns").withIndex("by_event_turnKey", (q) => q.eq("eventId", eventId).eq("turnKey", k)).unique();
-      if (row) await ctx.db.delete(row._id);
+      if (row) {
+        await ctx.db.delete(row._id);
+        removed++;
+      }
     }
-    return { removed: turnKeys.length };
+    return { removed };
   },
 });
 
@@ -78,7 +82,7 @@ export const replaceChapters = internalMutation({
   },
 });
 
-// Insert-only per candidateKey: an existing verdict is never overwritten.
+// One row per candidateKey; a fresh verdict replaces the stored one (latest `at` wins; an older one is ignored).
 export const recordConfirmations = internalMutation({
   args: {
     eventId: v.number(),
@@ -88,18 +92,21 @@ export const recordConfirmations = internalMutation({
     for (const r of rows) {
       const dup = await ctx.db.query("speakerConfirmations").withIndex("by_event_candidate", (q) => q.eq("eventId", eventId).eq("candidateKey", r.candidateKey)).first();
       if (!dup) await ctx.db.insert("speakerConfirmations", { eventId, ...r });
+      else if (r.at >= dup.at) await ctx.db.replace(dup._id, { eventId, ...r });
     }
   },
 });
 
 export const setOverride = internalMutation({
-  args: { eventId: v.number(), label: v.string(), name: v.string(), by: v.string(), at: v.number() },
+  args: { eventId: v.number(), label: v.string(), name: v.optional(v.string()), hidden: v.optional(v.boolean()), by: v.string(), at: v.number() },
   handler: async (ctx, a) => {
-    const name = a.name.trim();
-    if (!name) throw new Error("override name must not be empty");
+    // hidden: no name stored; the label shows as "Speaker X".
+    const name = a.hidden ? "" : (a.name ?? "").trim();
+    if (!a.hidden && !name) throw new Error("override name must not be empty");
+    const doc = { eventId: a.eventId, label: a.label, name, by: a.by, at: a.at, ...(a.hidden ? { hidden: true } : {}) };
     const row = await ctx.db.query("speakerOverrides").withIndex("by_event_label", (q) => q.eq("eventId", a.eventId).eq("label", a.label)).first();
-    if (row) await ctx.db.replace(row._id, { ...a, name });
-    else await ctx.db.insert("speakerOverrides", { ...a, name });
+    if (row) await ctx.db.replace(row._id, doc);
+    else await ctx.db.insert("speakerOverrides", doc);
   },
 });
 
@@ -134,6 +141,11 @@ export const itemsForEvent = internalQuery({
 export const turnKeysForEvent = internalQuery({
   args: { eventId: v.number() },
   handler: async (ctx, { eventId }) => (await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect()).map((t) => t.turnKey),
+});
+
+export const sourceForEvent = internalQuery({
+  args: { eventId: v.number() },
+  handler: async (ctx, { eventId }) => ((await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).first())?.source ?? "none") as "transcript" | "captions" | "none",
 });
 
 export const confirmationsForEvent = internalQuery({
@@ -180,9 +192,9 @@ export const meetingView = query({
     const turns: Turn[] = rows.map((t) => ({ eventId, turnKey: t.turnKey, chunk: t.chunk, startMs: t.startMs, endMs: t.endMs, label: t.label ?? null, text: t.text }));
     const accepted: SpeakerAssignment[] = [
       ...assignments.map((a) => ({ label: a.label, name: a.name, source: a.source, evidenceTurnKey: a.evidenceTurnKey, ...(a.personId !== undefined ? { personId: a.personId } : {}) })),
-      ...overrides.map((o) => ({ label: o.label, name: o.name, source: "manual" as const, evidenceTurnKey: "", at: o.at })),
+      ...overrides.filter((o) => !o.hidden).map((o) => ({ label: o.label, name: o.name, source: "manual" as const, evidenceTurnKey: "", at: o.at })),
     ];
-    const names = new Map(nameSpeakers(turns, accepted).map((n) => [n.turnKey, n]));
+    const names = new Map(nameSpeakers(turns, accepted, overrides.filter((o) => o.hidden).map((o) => o.label)).map((n) => [n.turnKey, n]));
     const chapters = await ctx.db.query("chapters").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
     return {
       transcriptSource: (rows[0]?.source ?? "none") as "transcript" | "captions" | "none",

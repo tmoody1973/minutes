@@ -54,12 +54,30 @@ describe("overrides", () => {
 });
 
 describe("model decisions", () => {
-  it("confirmations are insert-only per key", async () => {
+  it("a fresh verdict replaces the stored one for the same key (latest `at` wins)", async () => {
     const t = convexTest(schema, modules);
     const row = { candidateKey: "k", confirm: true, reason: "r1", model: "m", at: 1 };
     await t.mutation(internal.media.recordConfirmations, { eventId: 1, rows: [row] });
-    await t.mutation(internal.media.recordConfirmations, { eventId: 1, rows: [{ ...row, confirm: false, reason: "r2" }] });
-    expect(await t.query(internal.media.confirmationsForEvent, { eventId: 1 })).toEqual([row]);
+    const reject = { ...row, confirm: false, reason: "r2", at: 2 };
+    await t.mutation(internal.media.recordConfirmations, { eventId: 1, rows: [reject] });
+    expect(await t.query(internal.media.confirmationsForEvent, { eventId: 1 })).toEqual([reject]);
+    await t.mutation(internal.media.recordConfirmations, { eventId: 1, rows: [row] }); // older: ignored
+    expect(await t.query(internal.media.confirmationsForEvent, { eventId: 1 })).toEqual([reject]);
+  });
+  it("removeTurns returns the actual deleted count", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.media.upsertTurns, { eventId: 1, turns: [turn("0:1", 0, "c0:A")] });
+    expect(await t.mutation(internal.media.removeTurns, { eventId: 1, turnKeys: ["0:1", "0:9"] })).toEqual({ removed: 1 });
+  });
+  it("a hidden override shows Speaker X over an automatic name; clear restores it", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.media.upsertTurns, { eventId: 1, turns: [turn("0:1", 0, "c0:E")] });
+    await t.mutation(internal.media.replaceAssignments, { eventId: 1, assignments: [{ label: "c0:E", name: "Willie Smith", source: "legistar", evidenceTurnKey: "0:1" }] });
+    await t.mutation(internal.media.setOverride, { eventId: 1, label: "c0:E", hidden: true, by: "tarik", at: 5 });
+    expect((await t.query(api.media.meetingView, { eventId: 1 })).turns[0].display).toBe("Speaker A");
+    expect((await t.query(internal.media.overridesForEvent, { eventId: 1 }))[0]).toMatchObject({ hidden: true });
+    await t.mutation(internal.media.clearOverride, { eventId: 1, label: "c0:E" });
+    expect((await t.query(api.media.meetingView, { eventId: 1 })).turns[0].display).toBe("Willie Smith");
   });
   it("chapters are replaced per event only", async () => {
     const t = convexTest(schema, modules);

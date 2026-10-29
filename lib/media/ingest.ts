@@ -63,3 +63,22 @@ export function chunkFiles(names: string[], dir: string): string[] {
   if (!files.length) throw new Error(`${dir} exists but has no chunk_*.json files; refusing to ingest (nothing was written)`);
   return files;
 }
+
+export type OverrideRow = { label: string; name: string; hidden?: boolean; at: number };
+
+// Names the Chapterer may see, plus the fingerprint. Hidden labels are dropped from the names but still change the fingerprint.
+export function partsNames(assignments: SpeakerAssignment[], overrides: OverrideRow[]) {
+  const hidden = new Set(overrides.filter((o) => o.hidden).map((o) => o.label));
+  const forParts: SpeakerAssignment[] = [
+    ...assignments.filter((a) => !hidden.has(a.label)),
+    ...overrides.filter((o) => !o.hidden).map((o) => ({ label: o.label, name: o.name, source: "manual" as const, evidenceTurnKey: "", at: o.at })),
+  ];
+  const fingerprint = namesFingerprint([...forParts, ...[...hidden].map((label) => ({ label, name: "\u2205hidden" }))]);
+  return { forParts, fingerprint, hidden: [...hidden] };
+}
+
+// Without a local transcript dir, never overwrite stored transcript turns with lower-quality captions unless asked.
+export function assertCaptionsAllowed(eventId: number, existing: "transcript" | "captions" | "none", allow: boolean) {
+  if (existing === "transcript" && !allow)
+    throw new Error(`event ${eventId}: data/transcripts/${eventId} is missing but transcript turns are stored; refusing to replace them with captions (pass --captions to override; nothing was written)`);
+}

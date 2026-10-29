@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { batchBySize, candidateKey, chunkFiles, labelOrder, namesFingerprint, outageRow, partsDecision, reuseOrCall } from "@/lib/media/ingest";
+import { assertCaptionsAllowed, partsNames, batchBySize, candidateKey, chunkFiles, labelOrder, namesFingerprint, outageRow, partsDecision, reuseOrCall } from "@/lib/media/ingest";
 
 describe("batchBySize", () => {
   it("splits so each batch JSON stays under the limit", () => {
@@ -83,4 +83,27 @@ describe("outageRow", () => {
 describe("chunkFiles", () => {
   it("sorts chunk files", () => expect(chunkFiles(["chunk_001.json", "x.txt", "chunk_000.json"], "d")).toEqual(["chunk_000.json", "chunk_001.json"]));
   it("throws on a directory with no chunks", () => expect(() => chunkFiles(["notes.txt"], "data/transcripts/1")).toThrow(/no chunk_\*\.json/));
+});
+
+describe("partsNames (hidden labels)", () => {
+  const asg = [{ label: "c0:E", name: "Willie Smith", source: "legistar" as const, evidenceTurnKey: "0:1" }];
+  it("hiding a label drops its name from the chapterer input and changes the fingerprint", () => {
+    const before = partsNames(asg, []);
+    const after = partsNames(asg, [{ label: "c0:E", name: "", hidden: true, at: 1 }]);
+    expect(before.forParts.map((p) => p.name)).toEqual(["Willie Smith"]);
+    expect(after.forParts).toEqual([]);
+    expect(after.fingerprint).not.toBe(before.fingerprint);
+  });
+  it("manual named override still passes through", () => {
+    expect(partsNames(asg, [{ label: "c0:E", name: "Kristen Connolly", at: 1 }]).forParts.map((p) => p.name)).toContain("Kristen Connolly");
+  });
+});
+
+describe("assertCaptionsAllowed", () => {
+  it("refuses captions over stored transcript turns unless --captions", () => {
+    expect(() => assertCaptionsAllowed(1, "transcript", false)).toThrow(/--captions/);
+    expect(() => assertCaptionsAllowed(1, "transcript", true)).not.toThrow();
+    expect(() => assertCaptionsAllowed(1, "captions", false)).not.toThrow();
+    expect(() => assertCaptionsAllowed(1, "none", false)).not.toThrow();
+  });
 });
