@@ -21,8 +21,16 @@ function wordKey(token: string): string | null {
   return /\p{L}/u.test(core) ? core.toLowerCase() : null;
 }
 
+// A run collapses only when no punctuation would be lost: leading marks may
+// sit on the first token alone, trailing marks on the last token alone.
+// "No. no" and "(the) the plan" stay as heard; "so so. the" collapses to "so.".
+function canCollapse(run: readonly Token[]): boolean {
+  const parts = run.map((t) => splitToken(t.text));
+  return parts.slice(1).every((p) => p.lead === "") && parts.slice(0, -1).every((p) => p.trail === "");
+}
+
 // Keeps the first token's leading punctuation and casing, and the last
-// token's trailing punctuation: "no, no?" -> "no?", "the the," -> "the,".
+// token's trailing punctuation: "the the," -> "the,", "(the the" -> "(the".
 function mergeRun(run: readonly Token[]): string {
   const { lead, core } = splitToken(run[0].text);
   const { trail } = splitToken(run[run.length - 1].text);
@@ -61,17 +69,21 @@ function correctToken(token: string, corrections: ReadonlyMap<string, string>): 
 }
 
 // Text outside an edit is copied byte-for-byte, so line breaks and double
-// spaces survive. Only a collapsed run is replaced, with the original
-// separator before it kept.
+// spaces survive. A collapsed run is replaced by one token; any other run is
+// emitted token by token as heard, with the original separators kept.
 export function cleanQuote(text: string, corrections: ReadonlyMap<string, string>): string {
   let out = "";
   let cursor = 0;
   for (const run of groupRuns(tokenize(text))) {
-    const first = run[0];
-    const last = run[run.length - 1];
-    const word = run.length > 1 ? mergeRun(run) : first.text;
-    out += text.slice(cursor, first.start) + correctToken(word, corrections);
-    cursor = last.end;
+    if (run.length > 1 && canCollapse(run)) {
+      out += text.slice(cursor, run[0].start) + correctToken(mergeRun(run), corrections);
+      cursor = run[run.length - 1].end;
+      continue;
+    }
+    for (const token of run) {
+      out += text.slice(cursor, token.start) + correctToken(token.text, corrections);
+      cursor = token.end;
+    }
   }
   return out + text.slice(cursor);
 }

@@ -4,59 +4,43 @@ import { cleanQuote } from "@/lib/media/clean";
 const none = new Map<string, string>();
 const dcd = new Map([["DCDCD", "DCD"]]);
 
-describe("cleanQuote: repeated words", () => {
-  it("collapses an immediately repeated word", () => {
-    expect(cleanQuote("a substitute substitute ordinance", none)).toBe("a substitute ordinance");
+describe("cleanQuote: repeated words collapse", () => {
+  it.each([
+    ["a substitute substitute ordinance", "a substitute ordinance"],
+    ["phase phase one,", "phase one,"],
+    ["the The plan", "the plan"],
+    ["the the the plan", "the plan"],
+    ["was the the, uh", "was the, uh"],
+    ["the the,", "the,"],
+    ["(the the plan", "(the plan"],
+    ["so so. the the plan", "so. the plan"],
+    ["line one\n\nthe the plan", "line one\n\nthe plan"],
+  ])("%j -> %j", (input, expected) => {
+    expect(cleanQuote(input, none)).toBe(expected);
   });
+});
 
-  it("keeps the trailing punctuation of the last repeat", () => {
-    expect(cleanQuote("phase phase one,", none)).toBe("phase one,");
+describe("cleanQuote: punctuation inside a run is never dropped", () => {
+  it.each([
+    "No. no",
+    "motion? motion?",
+    "no, no?",
+    "yes, yes.",
+    '"yes" yes',
+    "(the) the plan",
+  ])("leaves %j unchanged", (input) => {
+    expect(cleanQuote(input, none)).toBe(input);
   });
+});
 
-  it("keeps the first token's casing", () => {
-    expect(cleanQuote("the The plan", none)).toBe("the plan");
+describe("cleanQuote: numbers and non-words", () => {
+  it.each(["Ward 3 3", "1. 1.", "- - go", "the plan the plan"])("leaves %j unchanged", (input) => {
+    expect(cleanQuote(input, none)).toBe(input);
   });
+});
 
-  it("collapses runs of three or more", () => {
-    expect(cleanQuote("the the the plan", none)).toBe("the plan");
-  });
-
-  it("does not duplicate punctuation already on the first token", () => {
-    expect(cleanQuote("motion? motion?", none)).toBe("motion?");
-  });
-
-  it("takes trailing punctuation from the last token of the run", () => {
-    expect(cleanQuote("was the the, uh", none)).toBe("was the, uh");
-  });
-
-  it("keeps closing punctuation from the last token, replacing the first", () => {
-    expect(cleanQuote("no, no?", none)).toBe("no?");
-    expect(cleanQuote("yes, yes.", none)).toBe("yes.");
-    expect(cleanQuote("the the,", none)).toBe("the,");
-  });
-
-  it("keeps leading punctuation from the first token", () => {
-    expect(cleanQuote("(the the plan", none)).toBe("(the plan");
-  });
-
-  it("does not treat punctuation-only tokens as words", () => {
-    expect(cleanQuote("- - go", none)).toBe("- - go");
-  });
-
-  it("leaves repeated numbers as heard", () => {
-    expect(cleanQuote("Ward 3 3", none)).toBe("Ward 3 3");
-    expect(cleanQuote("1. 1.", none)).toBe("1. 1.");
-  });
-
-  it("does not collapse non-adjacent repeats", () => {
-    expect(cleanQuote("the plan the plan", none)).toBe("the plan the plan");
-  });
-
-  it("keeps the original line break before a collapsed run", () => {
-    expect(cleanQuote("line one\n\nthe the plan", none)).toBe("line one\n\nthe plan");
-  });
-
-  it("returns text with no repeats and no corrections unchanged, spacing included", () => {
+describe("cleanQuote: whitespace", () => {
+  it("returns text with no edits unchanged, spacing included", () => {
     const text = "  Item  4.   Public   hearing ";
     expect(cleanQuote(text, none)).toBe(text);
   });
