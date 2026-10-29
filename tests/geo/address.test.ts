@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { extractAddresses } from "@/lib/geo/address";
 
-const SOUTHGATE = "A substitute ordinance relating to the 5th Amendment to the Detailed Planned Development known as Southgate Marketplace, Phase 1 to allow the construction of a bank with drive-through ATM at 3473 South 27th Street, on the west side of South 27th Street, north of West Morgan Avenue, in the 11th Aldermanic District.";
-const BOOKENDS = "A substitute ordinance relating to the change in zoning from General Planned Development known as Bookends to a Detailed Planned Development known as Zenith to allow the construction of a multi-family residential building at 711 East Kilbourn Avenue and 822 North Van Buren Street, on the east side of North Van Buren Street, south of East Kilbourn Avenue, in the 4th Aldermanic District.";
-const KANE = "Substitute resolution relating to a Minor Modification to the Detailed Planned Development known as Kane Commons, Phase 1 to allow exterior alterations to the existing residential structure at 1162-64 East Kane Place, located on the north side of East Kane Place, east of North Humboldt Avenue, in the 3rd Aldermanic District.";
-const EVERETT = "A substitute ordinance relating to the change in zoning from General Planned Development to a new Detailed Planned Development known as The Everett Multifamily to allow a multi-family residential development on the property located at 234 South Water Street, on the east side of South Water Street, south of East Pittsburgh Avenue";
-const BADER = "A substitute ordinance relating to the change in zoning from Two-Family Residential, RT4, and Local Business, LB2, for the properties located at 410 West Concordia Avenue and 3301 and 3307 North Vel R. Phillips Avenue to Detailed Planned Development, DPD, and the 1st Amendment to the DPD known as Bader Philanthropies";
-const TEXT = "A substitute ordinance relating to zoning regulations for family day care homes.";
+import titles from "../fixtures/legistar/zoning-titles.json";
+
+const t = (file: string) => titles.find((x) => x.file === file)!.title;
+const SOUTHGATE = t("260532");
+const BOOKENDS = t("260533");
+const KANE = t("260047");
+const EVERETT = t("252190");
+const BADER = t("252189");
+const TEXT = t("260642");
 
 describe("extractAddresses", () => {
   it("Southgate: ignores location phrases", () => {
@@ -24,11 +27,11 @@ describe("extractAddresses", () => {
   it("Everett", () => {
     expect(extractAddresses(EVERETT)).toEqual([{ houseNumber: 234, dir: "S", street: "WATER", type: "ST" }]);
   });
-  it("Bader: list shares the street; keeps punctuation in names", () => {
+  it("Bader: list shares the street; MPROP spelling", () => {
     expect(extractAddresses(BADER)).toEqual([
       { houseNumber: 410, dir: "W", street: "CONCORDIA", type: "AV" },
-      { houseNumber: 3301, dir: "N", street: "VEL R. PHILLIPS", type: "AV" },
-      { houseNumber: 3307, dir: "N", street: "VEL R. PHILLIPS", type: "AV" },
+      { houseNumber: 3301, dir: "N", street: "VEL R PHILLIPS", type: "AV" },
+      { houseNumber: 3307, dir: "N", street: "VEL R PHILLIPS", type: "AV" },
     ]);
   });
   it("no addresses in text ordinance", () => {
@@ -45,5 +48,27 @@ describe("extractAddresses", () => {
   });
   it("ordinal and building counts are not house numbers", () => {
     expect(extractAddresses("in the 4th Aldermanic District; 5th Amendment; Phase 1")).toEqual([]);
+  });
+  it("strips apostrophes and collapses whitespace", () => {
+    expect(extractAddresses("at 100 North O'Brien Street")[0].street).toBe("OBRIEN");
+    expect(extractAddresses("at 100 North Foo\n  Bar Street")[0].street).toBe("FOO BAR");
+  });
+  it("allows lowercase connectors", () => {
+    expect(extractAddresses("at 2000 North Fond du Lac Avenue")).toEqual([{ houseNumber: 2000, dir: "N", street: "FOND DU LAC", type: "AV" }]);
+  });
+  it("requires the direction word", () => {
+    expect(extractAddresses("at 2000 Fond du Lac Avenue")).toEqual([]);
+  });
+  it("range rollover", () => {
+    expect(extractAddresses("at 1199-02 North Water Street")[0]).toMatchObject({ houseNumber: 1199, houseNumberHigh: 1202 });
+  });
+  it("numbers after Phase/Unit/No./Lot are not house numbers", () => {
+    expect(extractAddresses("Phase 1 North Plaza Court")).toEqual([]);
+    expect(extractAddresses("Unit 5 North Plaza Court")).toEqual([]);
+  });
+  it("skips context sites introduced by 'includes'", () => {
+    expect(extractAddresses(BADER).some((a) => a.houseNumber === 3300)).toBe(false);
+    expect(extractAddresses("the DPD that includes 100 North Foo Street")).toEqual([]);
+    expect(extractAddresses("the DPD which currently includes 100 North Foo Street")).toEqual([]);
   });
 });
