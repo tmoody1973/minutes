@@ -1,0 +1,19 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub2.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20250324190752/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub2.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# Special use (295-201-619)
+   619.      SPECIAL USE means a use which is generally acceptable in a particular zoning district but
+which, because of its characteristics and the characteristics of the zoning district in which it would be
+located, requires review on a case-by-case basis to determine whether it should be permitted, conditionally
+permitted or denied.
+
+# Variance (dimensional) (295-201-675)
+   675.    VARIANCE, DIMENSIONAL means permission from the board to depart from any of the literal
+requirements of this chapter except use regulations, including but not limited to a departure from an area,
+setback, frontage, height, bulk, density or design requirement.
+
+# Variance (use) (295-201-676)
+   676.    VARIANCE, USE means permission from the board to depart from any of the use regulations of
+this chapter.

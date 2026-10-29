@@ -1,0 +1,43 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub5.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20250324001550/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub5.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# Single-Family Residential (RS1-RS5) (295-501-1-a)
+     1.        SINGLE-FAMILY RESIDENTIAL DISTRICTS. a. RS1-RS5 Districts. The purpose of the RS1-
+RS5 districts is to promote, preserve and protect neighborhoods intended for single-family dwellings and
+having a character slightly more suburban than the RS6 district. These districts require larger lots, larger
+setbacks and a smaller lot coverage than the RS6 district. The neighborhoods found in these districts feature
+a regular platting pattern and a more uniform pattern of development than those of the RS6 district. These
+neighborhoods were platted and developed, in large part, in the mid- to late-1900s, with some areas recently
+developed.
+
+# Two-Family Residential (RT3) (295-501-2-b)
+     b.        RT3 District. The purpose of the RT3 district is to promote, preserve and protect neighborhoods
+intended primarily for two-family dwellings with a traditional urban character. This district, much like the RT4
+district, allows smaller lots, smaller setbacks and a higher lot coverage than the RT1 and RT2 districts.
+However, it does not allow the establishment of new, multi-family buildings. The neighborhoods in this district
+were platted and developed, in large part, in the early 1900s and tend to be more uniform than those of the
+RT4 district.
+
+# Two-Family Residential (RT4) (295-501-2-c)
+     c.        RT4 District. The purpose of the RT4 district is to promote, preserve and protect neighborhoods
+intended primarily for 2-family dwellings while also permitting a mixture of single-family dwellings and small
+multi-family dwellings of 3 or 4 units. This district, much like the RT3 district, allows smaller lots, smaller
+setbacks and a higher lot coverage than the RT1 and RT2 districts. The neighborhoods found in this district
+were platted and developed, in large part, in the late 1800s and early 1900s. This district also allows
+traditional corner commercial establishments commonly found in urban neighborhoods.
+
+# Multi-Family Residential (RM3) (295-501-3-b)
+     b.         RM3 District. The purpose of the RM3 district is to promote, preserve, and protect neighborhoods
+intended primarily for medium-density residential uses with an urban character. This district, much like the
+RM4-RM7 districts, allows smaller lots, smaller setbacks and higher lot coverage than the RM1-RM2 districts.
+ However, the neighborhoods in this district were platted and developed, in large part, in the early 1900s and
+tend to be more uniform and of a lower density than those of the RM4-RM7 districts. This district also allows
+traditional corner commercial establishments commonly found in urban neighborhoods.
+
+# Multi-Family Residential (RM4-RM7) (295-501-3-c)
+     c.         RM4-RM7 Districts. The purpose of the RM4-RM7 districts is to promote, preserve and protect
+neighborhoods intended primarily for high-density multi-family residential uses. These districts allow a wide
+range of lot sizes, smaller setbacks, and a high percentage of lot coverage. They also allow neighborhood-
+serving commercial establishments commonly found in urban neighborhoods.

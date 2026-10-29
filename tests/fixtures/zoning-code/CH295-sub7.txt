@@ -1,0 +1,14 @@
+# Source: https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub7.pdf
+# Extracted with pdftotext -layout from the Wayback Machine copy of that PDF:
+# https://web.archive.org/web/20250809054533/https://city.milwaukee.gov/ImageLibrary/Groups/ccClerk/Ordinances/Volume-2/CH295-sub7.pdf
+# (city.milwaukee.gov blocks scripted fetches). Excerpts only; line wraps and page footers are as printed.
+
+# High-Density Residential (C9A) (295-701-1)
+295-701. Purposes. 1. HIGH-DENSITY RESIDENTIAL (C9A). The high-density residential district is designed
+and intended to serve as a highly urban living environment for those persons or families desirous of a
+residential location in close proximity to the city's downtown, as delineated in the city’s comprehensive plan.
+
+# Office and Service (C9F) (295-701-6)
+    6.          OFFICE AND SERVICE (C9F). The office and service district is designed and intended to serve
+both as a retail trade and a personal and business services district, as well as a major center of office
+commercial activities.
