@@ -16,7 +16,7 @@ export function labelChapters(turns: { label: string | null; startMs: number }[]
 }
 
 export const granicusLink = (clipId: number, startMs: number): string =>
-  `https://milwaukee.granicus.com/MediaPlayer.php?clip_id=${clipId}&starttime=${Math.floor(startMs / 1000)}`;
+  `https://milwaukee.granicus.com/player/clip/${clipId}?view_id=2&redirect=true&entrytime=${Math.floor(startMs / 1000)}`;
 
 function editDistance(a: string, b: string): number {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
@@ -41,10 +41,10 @@ export function spellingHints(heardName: string, minutesText: string): string[] 
   let run: string[] = [];
   for (const tok of minutesText.split(/\s+/)) {
     const word = tok.replace(/[.,:;()]+$/, "").replace(/^[("]+/, "");
-    const capitalized = /^[A-Z][A-Za-z'’-]+$/.test(word) && !HONORIFICS.has(word.toLowerCase());
+    const capitalized = /^\p{Lu}[\p{L}'’-]+$/u.test(word) && !HONORIFICS.has(word.toLowerCase());
     if (!capitalized) { run = []; continue; }
     run = [...run, word].slice(-3);
-    if (editDistance(word.toLowerCase(), surname) <= 2) {
+    if (editDistance(word.toLowerCase(), surname) <= (Math.min(word.length, surname.length) < 4 ? 1 : 2)) {
       const names = run.length === 1 ? [word] : [3, 2].filter((n) => run.length >= n && (!initial || run[run.length - n][0].toLowerCase() === initial)).map((n) => run.slice(-n).join(" "));
       const hint = run.length === 1 || names.length ? names[0] : undefined;
       if (hint && hint.toLowerCase() !== heardName.trim().toLowerCase() && !hints.includes(hint)) hints.push(hint);

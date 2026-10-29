@@ -77,6 +77,7 @@ process.stdout.on("error", (e: NodeJS.ErrnoException) => { if (e.code === "EPIPE
 const argv = process.argv.slice(2);
 const itemAt = argv.indexOf("--item");
 const itemArg = itemAt >= 0 ? argv.splice(itemAt, 2)[1] : undefined;
+if (itemAt >= 0 && !itemArg) { console.error("usage: speakers.ts list <eventId> --item <fileNumber>"); process.exit(1); }
 const [cmd, idArg, label, ...rest] = argv;
 const eventId = Number(idArg);
 try {

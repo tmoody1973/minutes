@@ -71,6 +71,8 @@ describe("parseEventItem", () => {
     const note = (n: unknown) => parseEventItem({ ...base, EventItemMinutesNote: n }).minutesNote;
     expect(note("<p>Appearing: Brian Emrich, Allegro Civil Engineers</p>")).toBe("Appearing: Brian Emrich, Allegro Civil Engineers");
     expect(note("<p>A &amp; B</p>\r\n<p>Mr.&nbsp;Salata  &#8211; ok</p>")).toBe("A & B Mr. Salata \u2013 ok");
+    expect(note("O&rsquo;Brien &amp; Jos&eacute; &ndash; &hellip; &bogus;")).toBe("O\u2019Brien & Jos\u00e9 \u2013 \u2026 &bogus;");
+    expect(note("bad &#99999999; and &#x110000; and &#0; and &#xD800; end")).toBe("bad &#99999999; and &#x110000; and &#0; and &#xD800; end");
     expect(note(null)).toBeUndefined();
     expect(note("<p> </p>")).toBeUndefined();
   });

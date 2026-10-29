@@ -3,7 +3,7 @@ import { granicusLink, labelChapters, selfIntroName, spellingHints } from "@/lib
 
 describe("granicusLink", () => {
   it("links to the second", () => {
-    expect(granicusLink(8765, 829999)).toBe("https://milwaukee.granicus.com/MediaPlayer.php?clip_id=8765&starttime=829");
+    expect(granicusLink(8765, 829999)).toBe("https://milwaukee.granicus.com/player/clip/8765?view_id=2&redirect=true&entrytime=829");
   });
 });
 
@@ -36,6 +36,16 @@ describe("spellingHints", () => {
   it("matches a different first name with the same initial", () => {
     expect(spellingHints("Dave Salata", "Public testimony in support: David Celata, Milwaukee Greater Foundation Mr. Salata testified")).toEqual(["David Celata", "Salata"]);
   });
+  it("needs the first initial to match for a two-word hint", () => {
+    expect(spellingHints("Dave Salata", "Public testimony: Frank Celata, resident")).toEqual([]);
+  });
+  it("handles accented letters", () => {
+    expect(spellingHints("Jose Perez", "Appearing: José Pérez, resident")).toEqual(["José Pérez"]);
+  });
+  it("is stricter for short surnames", () => {
+    expect(spellingHints("Tom Lee", "Appearing: Tim Lao, resident")).toEqual([]);
+    expect(spellingHints("Tom Lee", "Appearing: Tom Lea, resident")).toEqual(["Tom Lea"]);
+  });
   it("returns nothing without a near match, and never the heard name", () => {
     expect(spellingHints("Jane Doe", "Appearing: Brian Emrich, Allegro Civil Engineers")).toEqual([]);
     expect(spellingHints("Brian Emrich", "Appearing: Brian Emrich, Allegro")).toEqual([]);
@@ -45,6 +55,8 @@ describe("spellingHints", () => {
 describe("selfIntroName", () => {
   it("reads a spoken introduction", () => {
     expect(selfIntroName("Absolutely my name is Brian Emmerich I'm with Allegro civil engineers")).toBe("Brian Emmerich");
+    expect(selfIntroName("hi I'm Mark Larson with Korb")).toBe("Mark Larson");
+    expect(selfIntroName("yes I am Zak Klobucar")).toBe("Zak Klobucar");
     expect(selfIntroName("this is the main entry again Kilbourn and Van Buren")).toBeUndefined();
   });
 });
