@@ -2,8 +2,13 @@ import type { Cue, Turn } from "@/lib/types";
 
 // Precision over recall: any doubt -> no cue.
 
-const LEAD_IN = /^(?:(?:good (?:afternoon|morning|evening)|hello|hi|yes|thank you|um|uh)(?:\s+(?:everyone|all))?[\s,.!]*)+/i;
-const HONORIFIC = /\b(?:Commissioner|Alderman|Alderwoman|Alderperson|Ald\.?|Ms\.?|Mr\.?|Mrs\.?|Dr\.?)\s+/gi;
+const LEAD_IN = /^(?:(?:good (?:afternoon|morning|evening)|hello|hi|yes|thank you|um|uh)\b(?:\s+(?:everyone|all)\b)?[\s,.!]*)+/i;
+const HON_WORDS = "Commissioner|Alderman|Alderwoman|Alderperson|Ald\\.?|Ms\\.?|Mr\\.?|Mrs\\.?|Dr\\.?";
+const LEADING_HON = new RegExp(`^(?:${HON_WORDS})\\s+`, "i");
+const FILLERS_ONLY = /^(?:\s*(?:okay|ok|um|uh|so|and|next|all right|alright|yes)\b[\s,.]*)*$/i;
+const TITLES = new Set(["chair", "chairman", "chairwoman", "chairperson", "president", "vice", "madam", "mister", "sir", "commissioner", "alderman", "alderwoman", "alderperson", "ald", "ms", "mr", "mrs", "dr"]);
+const badNameWord = (w: string) => TITLES.has(w.toLowerCase().replace(/\.$/, ""));
+const HONORIFIC = new RegExp(`\\b(?:${HON_WORDS})\\s+`, "gi");
 const HANDOFF =
   /^[\s,]*(?:the floor is yours|go ahead|would you like to|you(?:'|’)re recognized|you are recognized|please come forward|introduce yourselves?|for the record)/i;
 const NOT_A_NAME = new Set(["the", "a", "an", "and", "for", "would", "you", "to", "of", "is", "on", "in", "i", "we", "at"]);
@@ -19,7 +24,9 @@ function recognizedCue(turn: Turn): string | null {
   for (let m = HONORIFIC.exec(text); m; m = HONORIFIC.exec(text)) {
     // attendance notes / escorts are not hand-offs
     if (/(?:joined|escorted|accompanied) by\s+$/i.test(text.slice(0, m.index))) continue;
-    const rest = text.slice(m.index + m[0].length);
+    let rest = text.slice(m.index + m[0].length);
+    while (LEADING_HON.test(rest)) rest = rest.replace(LEADING_HON, ""); // stutter: one honorific
+    const wholeTurn = FILLERS_ONLY.test(text.slice(0, m.index));
     const tokens = rest.split(/\s+/).filter(Boolean);
     for (const k of [1, 2]) {
       const words = tokens.slice(0, k);
@@ -27,11 +34,11 @@ function recognizedCue(turn: Turn): string | null {
       // internal punctuation (comma/period mid-name) means the name ended earlier
       if (words.slice(0, -1).some((w) => /[,.;?!]$/.test(w))) break;
       const names = words.map(clean);
-      if (!names.every((w) => WORD.test(w) && !NOT_A_NAME.has(w.toLowerCase()))) break;
+      if (!names.every((w) => WORD.test(w) && CAP.test(w) && !NOT_A_NAME.has(w.toLowerCase()) && !badNameWord(w))) break;
       // remainder after the name words
       const idx = words.reduce((pos, w) => rest.indexOf(w, pos) + w.length, 0);
       const after = rest.slice(idx);
-      if (HANDOFF.test(after) || /^[\s.,?!]*$/.test(after)) return names.join(" ");
+      if (HANDOFF.test(after) || (wholeTurn && /^[\s.,?!]*$/.test(after))) return names.join(" ");
     }
   }
   return null;
@@ -52,7 +59,7 @@ function parseName(tokens: string[], needCap: boolean): Parsed | null {
     else if (lower === "with" || lower === "from" || lower === "and") stop = lower;
     if (stop) return words.length ? { name: words.join(" "), rest: tokens.slice(i + 1), stop } : null;
     const w = clean(tok);
-    if (!WORD.test(w) || (needCap && !CAP.test(w))) return null;
+    if (!WORD.test(w) || (needCap && !CAP.test(w)) || NOT_A_NAME.has(w.toLowerCase()) || badNameWord(w)) return null;
     words.push(w);
     if (/[,.]$/.test(tok)) return { name: words.join(" "), rest: tokens.slice(i + 1), stop: "punct" };
   }
@@ -78,7 +85,7 @@ function selfCue(turn: Turn): { name: string; affiliation?: string } | null {
   let m: RegExpMatchArray | null;
 
   if ((m = s.match(/^my name is\s+([\s\S]+)/i))) {
-    const p = parseName(tokens(m[1]), false);
+    const p = parseName(tokens(m[1]), true);
     if (!p) return null;
     const viaWithFrom = p.stop === "with" || p.stop === "from";
     const viaIm = p.stop === "i'm" && /^(?:with|from)$/i.test(p.rest[0] ?? "");
@@ -86,16 +93,16 @@ function selfCue(turn: Turn): { name: string; affiliation?: string } | null {
   }
   if ((m = s.match(/^this is\s+([\s\S]+)/i))) {
     const p = parseName(tokens(m[1]), true);
-    if (!p || !["with", "from", "i live", "i'm"].includes(p.stop)) return null;
+    if (!p || p.name.split(" ").length < 2 || !["with", "from", "i live", "i'm"].includes(p.stop)) return null;
     return { name: p.name, affiliation: p.stop === "with" || p.stop === "from" ? affiliationOf(p.rest) : undefined };
   }
   if ((m = s.match(/^I(?:'|’)m\s+([\s\S]+)/i))) {
     const p = parseName(tokens(m[1]), true);
-    if (!p || (p.stop !== "with" && p.stop !== "from")) return null;
+    if (!p || p.name.split(" ").length < 2 || (p.stop !== "with" && p.stop !== "from")) return null;
     return { name: p.name, affiliation: affiliationOf(p.rest) };
   }
   if ((m = s.match(/^((?:[A-Z][\p{L}'’-]*\s+){1,3}[A-Z][\p{L}'’-]*),\s*([^.,]{0,40}?\bPlanning)\b/u))) {
-    if (new RegExp(`^${HONORIFIC.source}`, "i").test(m[1] + " ")) return null;
+    if (m[1].split(/\s+/).some(badNameWord)) return null;
     return { name: m[1], affiliation: m[2].trim() };
   }
   return null;
@@ -108,7 +115,7 @@ export function extractCues(turns: Turn[]): Cue[] {
     if (self) cues.push({ kind: "self", ...self, turnKey: turn.turnKey, targetTurnKey: turn.turnKey });
     const name = recognizedCue(turn);
     if (name) {
-      const target = turns.slice(i + 1).find((t) => t.label !== null && t.label !== turn.label);
+      const target = turns.slice(i + 1, i + 4).find((t) => t.label !== null && t.label !== turn.label);
       if (target) cues.push({ kind: "recognized", name, turnKey: turn.turnKey, targetTurnKey: target.turnKey });
     }
   });
