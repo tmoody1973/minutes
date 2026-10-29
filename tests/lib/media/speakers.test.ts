@@ -107,10 +107,18 @@ describe("assignFromCues", () => {
   it("Ruling 16: self cue takes a roster identity only if first name/initial agree", () => {
     const a = t("c0:A");
     const run = (name: string, r: RosterEntry[]) => assignFromCues([a], [cue("self", name, a, a)], r);
-    expect(run("Sam Burgess", roster)[0]).toMatchObject({ source: "legistar", personId: 2 });
+    expect(run("Sam Burgelis", roster)[0]).toMatchObject({ source: "legistar", personId: 2 });
     expect(run("Tom Burgess", roster)[0]).toMatchObject({ source: "self-intro", name: "Tom Burgess" });
     expect(run("Sam Burgess", [{ personId: 8, name: "Scott Burgelis" }])[0]).toMatchObject({ source: "self-intro", name: "Sam Burgess" });
     expect(run("Scot Burgelis", [{ personId: 8, name: "Scott Burgelis" }])[0]).toMatchObject({ source: "legistar", personId: 8 });
+  });
+  it("self-intro roster upgrade needs an exact surname (no edit distance)", () => {
+    const a = t("c0:A");
+    const r = [{ personId: 9, name: "JOHN SMITH" }];
+    expect(assignFromCues([a], [cue("self", "Jon Smyth", a, a)], r)[0]).toMatchObject({ source: "self-intro", name: "Jon Smyth" });
+    expect(assignFromCues([a], [cue("self", "Sam Burgess", a, a)], roster)[0]).toMatchObject({ source: "self-intro" });
+    // recognized cues keep Ruling 10 tolerance
+    expect(assignFromCues([a, t("c0:B")], [cue("recognized", "Smyth", a, a)], r)[0]).toMatchObject({ source: "legistar", personId: 9 });
   });
   it("skips cues whose target is missing or unlabeled", () => {
     const a = t("c0:A");
@@ -202,7 +210,46 @@ describe("nameSpeakers", () => {
   });
 });
 
+describe("nameSpeakers hidden labels", () => {
+  it("a hidden label shows as a Speaker letter even with an automatic assignment", () => {
+    const a = t("c0:E");
+    const b = t("c0:F");
+    const acc: SpeakerAssignment[] = [{ label: "c0:E", name: "Willie Smith", source: "legistar", evidenceTurnKey: a.turnKey }];
+    expect(nameSpeakers([a, b], acc, ["c0:E"]).map((o) => o.display)).toEqual(["Speaker A", "Speaker B"]);
+    expect(nameSpeakers([a, b], acc)[0].display).toBe("Willie Smith");
+  });
+});
+
 describe("confirmAssignments", () => {
+  it("shows the model EVERY turn of the label (mixed-speaker case) and honors a reject", async () => {
+    const roll = t("c0:A", "Commissioner Smith.");
+    const present = t("c0:E", "Present.");
+    const mid = t("c0:A", "Next item.");
+    const aye = t("c0:E", "Aye");
+    const rep = t("c0:E", "Kristen Connolly, DCD Planning, " + "we do recommend approval of the file. ".repeat(30) + "END_OF_REPORT");
+    const turns = [roll, present, mid, aye, t("c0:A", "a"), t("c0:A", "b"), t("c0:A", "c"), t("c0:A", "d"), rep];
+    const cand: SpeakerAssignment = { label: "c0:E", name: "Willie Smith", source: "legistar", evidenceTurnKey: roll.turnKey };
+    const spark = vi.fn(async () => ({ confirm: false, reason: "label also carries a DCD staff presentation" }));
+    const r = await confirmAssignments([cand], turns, [cue("recognized", "Smith", roll, present)], spark as never);
+    const user = (spark.mock.calls[0] as unknown as string[])[1];
+    expect(user).toContain("Present.");
+    expect(user).toContain("Aye");
+    expect(user).toContain("Kristen Connolly, DCD Planning");
+    expect(user).toContain(`${rep.turnKey} `);
+    expect(user).not.toContain("END_OF_REPORT"); // clipped to ~400 chars
+    expect(user).toMatch(/all of (these|those) turns/i);
+    expect(user.indexOf("<transcript>")).toBeLessThan(user.indexOf("Kristen Connolly"));
+    expect(user.indexOf("Kristen Connolly")).toBeLessThan(user.indexOf("</transcript>"));
+    expect(r.accepted).toEqual([]);
+    expect(r.rejected[0].reason).toMatch(/staff/);
+  });
+  it("caps the label block at about 20k chars", async () => {
+    const turns = [t("c0:A", "Commissioner Smith."), ...Array.from({ length: 200 }, () => t("c0:E", "x".repeat(390)))];
+    const cand: SpeakerAssignment = { label: "c0:E", name: "Willie Smith", source: "legistar", evidenceTurnKey: turns[0].turnKey };
+    const spark = vi.fn(async () => ({ confirm: false, reason: "r" }));
+    await confirmAssignments([cand], turns, [cue("recognized", "Smith", turns[0], turns[1])], spark as never);
+    expect((spark.mock.calls[0] as unknown as string[])[1].length).toBeLessThan(24_000);
+  });
   const setup = () => {
     const turns = [t("c0:A", "Alderman Pratt."), t("c0:B", "Thank you chair."), t("c0:A", "Go on")];
     const cand: SpeakerAssignment = { label: "c0:B", name: "Ald. A. Pratt", personId: 3, source: "legistar", evidenceTurnKey: turns[0].turnKey };
