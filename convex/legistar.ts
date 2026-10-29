@@ -215,3 +215,17 @@ export const lastSuccessfulSync = query({
     return null;
   },
 });
+
+// Speaker roster for a body: memberships joined to persons. Read-only.
+export const rosterForBody = internalQuery({
+  args: { bodyId: v.number() },
+  handler: async (ctx, { bodyId }) => {
+    const members = await ctx.db.query("memberships").withIndex("by_body", (q) => q.eq("bodyId", bodyId)).collect();
+    const out: { personId: number; name: string; role?: string }[] = [];
+    for (const m of members) {
+      const p = await ctx.db.query("persons").withIndex("by_legistarId", (q) => q.eq("legistarId", m.personId)).unique();
+      if (p) out.push({ personId: m.personId, name: p.name, ...(m.role ? { role: m.role } : {}) });
+    }
+    return out;
+  },
+});
