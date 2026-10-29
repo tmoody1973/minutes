@@ -201,3 +201,15 @@ describe("sync freshness", () => {
     expect(await t.query(api.legistar.lastSuccessfulSync, {})).toBeNull();
   });
 });
+
+describe("matters.parcels", () => {
+  const matter = { legistarId: 77, fileNumber: "250001", title: "T", typeName: "Ordinance", statusName: "In Committee" };
+  const parcel = { taxkey: "5331104000", address: "3473 S 27TH ST", zoning: "PD", alder: 11, lotAreaSqFt: 201334.32, owner: "X", polygon: { type: "Polygon", coordinates: [] }, centroid: { lat: 1, lng: 2 } };
+  it("survives a later matter upsert that does not carry it", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertMatter, matter);
+    await t.mutation(internal.legistar.setMatterParcels, { matterId: 77, parcels: [parcel] });
+    expect(await t.mutation(internal.legistar.upsertMatter, { ...matter, title: "T2" })).toEqual({ inserted: false, changedFields: ["title"] });
+    expect(await t.query(internal.legistar.getMatterParcels, { matterId: 77 })).toEqual([parcel]);
+  });
+});

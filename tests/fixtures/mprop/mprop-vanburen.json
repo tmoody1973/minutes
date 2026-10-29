@@ -1,0 +1,56 @@
+{
+ "success": true,
+ "result": {
+  "total": 4,
+  "records": [
+   {
+    "TAXKEY": "3921574100",
+    "HOUSE_NR_LO": "822",
+    "HOUSE_NR_HI": "822",
+    "SDIR": "N",
+    "STREET": "VAN BUREN",
+    "STTYPE": "ST",
+    "ZONING": "PD",
+    "GEO_ALDER": "4",
+    "LOT_AREA": "22965.00000",
+    "OWNER_NAME_1": "S R B, INC."
+   },
+   {
+    "TAXKEY": "0000005957",
+    "HOUSE_NR_LO": "1515",
+    "HOUSE_NR_HI": "1515",
+    "SDIR": "N",
+    "STREET": "VAN BUREN",
+    "STTYPE": "ST",
+    "ZONING": "RM6",
+    "GEO_ALDER": null,
+    "LOT_AREA": null,
+    "OWNER_NAME_1": null
+   },
+   {
+    "TAXKEY": "0000005961",
+    "HOUSE_NR_LO": "1641",
+    "HOUSE_NR_HI": "1641",
+    "SDIR": "N",
+    "STREET": "VAN BUREN",
+    "STTYPE": "ST",
+    "ZONING": "RT4",
+    "GEO_ALDER": null,
+    "LOT_AREA": null,
+    "OWNER_NAME_1": null
+   },
+   {
+    "TAXKEY": "0000005962",
+    "HOUSE_NR_LO": "1647",
+    "HOUSE_NR_HI": "1647",
+    "SDIR": "N",
+    "STREET": "VAN BUREN",
+    "STTYPE": "ST",
+    "ZONING": "RT4",
+    "GEO_ALDER": null,
+    "LOT_AREA": null,
+    "OWNER_NAME_1": null
+   }
+  ]
+ }
+}

@@ -47,6 +47,22 @@ export default defineSchema({
     syncedAt: v.optional(v.number()),
     // Exhibit list (name + hyperlink) from matters/{id}/attachments; Milestone 2 reads exhibit maps from it.
     attachments: v.optional(v.array(v.object({ name: v.string(), hyperlink: v.string() }))),
+    // Lots named in the title, from MPROP + the city parcel map. Unset = title has no addresses (or never looked up);
+    // [] = addresses exist but none resolved to a lot. Written only by setMatterParcels, never by upsertMatter.
+    parcels: v.optional(
+      v.array(
+        v.object({
+          taxkey: v.string(),
+          address: v.string(),
+          zoning: v.string(),
+          alder: v.union(v.number(), v.null()),
+          lotAreaSqFt: v.number(),
+          owner: v.string(),
+          polygon: v.union(v.any(), v.null()),
+          centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
+        }),
+      ),
+    ),
   }).index("by_legistarId", ["legistarId"]),
   histories: defineTable({
     legistarId: v.number(),

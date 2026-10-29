@@ -119,6 +119,32 @@ export const upsertMatter = internalMutation({
   handler: async (ctx, args) => out(await upsert(ctx, "matters", args)),
 });
 
+const parcelV = v.object({
+  taxkey: v.string(),
+  address: v.string(),
+  zoning: v.string(),
+  alder: v.union(v.number(), v.null()),
+  lotAreaSqFt: v.number(),
+  owner: v.string(),
+  polygon: v.union(v.any(), v.null()),
+  centroid: v.union(v.object({ lat: v.number(), lng: v.number() }), v.null()),
+});
+
+// parcels has its own writer: it is not in CLEARABLE, so a matter upsert that doesn't carry it leaves it alone.
+export const setMatterParcels = internalMutation({
+  args: { matterId: v.number(), parcels: v.array(parcelV) },
+  handler: async (ctx, { matterId, parcels }) => {
+    const row = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique();
+    if (row) await ctx.db.patch(row._id, { parcels });
+  },
+});
+
+export const getMatterParcels = internalQuery({
+  args: { matterId: v.number() },
+  handler: async (ctx, { matterId }) =>
+    (await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", matterId)).unique())?.parcels ?? null,
+});
+
 export const matterSyncedAt = internalQuery({
   args: { matterId: v.number() },
   handler: async (ctx, { matterId }) =>

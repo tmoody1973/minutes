@@ -3,6 +3,8 @@ import { internal } from "./_generated/api";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { legistarGet } from "../lib/legistar/client";
 import { parseEvent, parseEventItem, parseHistory, parseMatter, parseVote } from "../lib/legistar/parse";
+import { extractAddresses } from "../lib/geo/address";
+import { resolveParcels } from "../lib/geo/mprop";
 import { computeTally } from "../lib/legistar/tally";
 import { eventsFilter, hasVotes, isMatterFresh, matterIdsOf, memberFilter } from "../lib/legistar/plan";
 
@@ -100,9 +102,10 @@ export const syncEvent = internalAction({
 
 // One matter: record, history steps, and attachment list (name + link). Skipped if synced recently.
 export const syncMatter = internalAction({
-  args: { matterId: v.number() },
-  handler: async (ctx, { matterId }) => {
-    if (isMatterFresh(await ctx.runQuery(internal.legistar.matterSyncedAt, { matterId }), Date.now())) return;
+  // force: re-sync even if fresh (backfills fields added after the matter was last synced, e.g. parcels).
+  args: { matterId: v.number(), force: v.optional(v.boolean()) },
+  handler: async (ctx, { matterId, force }) => {
+    if (!force && isMatterFresh(await ctx.runQuery(internal.legistar.matterSyncedAt, { matterId }), Date.now())) return;
     await recorded(ctx, "child", `syncMatter ${matterId}`, async (c) => {
       const matter = parseMatter(await legistarGet<Raw>(`matters/${matterId}`));
       const attachments = (await legistarGet<Raw[]>(`matters/${matterId}/attachments`)).flatMap((a) =>
@@ -111,6 +114,18 @@ export const syncMatter = internalAction({
           : [],
       );
       await ctx.runMutation(internal.legistar.upsertMatter, { ...matter, attachments });
+      // Lots named in the title. Left unset when there are no addresses; [] when there are but none resolved.
+      // On failure the error is recorded (no sync stamp) and any previously stored parcels stay as they were.
+      const addresses = extractAddresses(matter.title);
+      if (addresses.length) {
+        await c.attempt(`parcels`, async () => {
+          const { parcels, errors } = await resolveParcels(addresses);
+          errors.forEach((e) => c.errors.push(`parcels ${e}`));
+          // A lookup that errored may have hidden a lot; only write when every address was checked cleanly
+          // or at least one lot was found (never replace good data with a worse partial empty list).
+          if (!errors.length || parcels.length) await ctx.runMutation(internal.legistar.setMatterParcels, { matterId, parcels });
+        });
+      }
       for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
         // Some rows carry no body (e.g. matter 74892 id 496081); a step with no body can't be shown, so skip it.
         if (typeof h.MatterHistoryActionBodyName !== "string") continue;
