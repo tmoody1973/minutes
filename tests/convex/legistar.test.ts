@@ -152,8 +152,8 @@ describe("sync runs", () => {
 
 describe("withdrawn agenda items", () => {
   const items = (t: ReturnType<typeof convexTest>) => t.run((ctx) => ctx.db.query("eventItems").collect());
-  const mark = (t: ReturnType<typeof convexTest>, presentIds: number[], at: number) =>
-    t.mutation(internal.legistar.markEventItemsRemoved, { eventId: 200, presentIds, at });
+  const mark = (t: ReturnType<typeof convexTest>, presentIds: number[], at: number, eventDropped?: boolean) =>
+    t.mutation(internal.legistar.markEventItemsRemoved, { eventId: 200, presentIds, at, eventDropped });
 
   it("absent items get removedAt, are never deleted, and keep the first timestamp", async () => {
     const t = convexTest(schema, modules);
@@ -172,10 +172,51 @@ describe("withdrawn agenda items", () => {
   it("an item that reappears has removedAt cleared by the normal upsert", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.legistar.upsertEventItem, item);
-    await mark(t, [], 111);
+    await mark(t, [], 111, true);
     expect((await items(t))[0].removedAt).toBe(111);
     expect((await t.mutation(internal.legistar.upsertEventItem, item)).changedFields).toEqual(["removedAt"]);
     expect((await items(t))[0]).not.toHaveProperty("removedAt");
+  });
+});
+
+describe("empty Legistar replies (F.1)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+  const items = (t: ReturnType<typeof convexTest>) => t.run((ctx) => ctx.db.query("eventItems").collect());
+  const runs = (t: ReturnType<typeof convexTest>) => t.run((ctx) => ctx.db.query("syncRuns").collect());
+  const emptyLegistar = () => vi.stubGlobal("fetch", async () => new Response("[]", { status: 200 }));
+
+  it("markEventItemsRemoved refuses an empty list for an event with live items unless the event was dropped", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertEventItem, item);
+    await expect(t.mutation(internal.legistar.markEventItemsRemoved, { eventId: 200, presentIds: [], at: 1 })).rejects.toThrow(/no items/);
+    expect((await items(t))[0].removedAt).toBeUndefined();
+  });
+
+  it("syncEvent with an empty agenda keeps stored items and records the failure", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertEventItem, item);
+    emptyLegistar();
+    await t.action(internal.sync.syncEvent, { eventId: 200 });
+    expect((await items(t))[0].removedAt).toBeUndefined();
+    expect(await runs(t)).toEqual([expect.objectContaining({ ok: false, scope: "child" })]);
+  });
+
+  it("syncEvent with an empty agenda and nothing stored is not an error (agenda not posted yet)", async () => {
+    const t = convexTest(schema, modules);
+    emptyLegistar();
+    await t.action(internal.sync.syncEvent, { eventId: 200 });
+    expect(await runs(t)).toEqual([]);
+  });
+
+  it("syncEvents with an empty meeting list keeps stored items and records the failure", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 1, bodyId: 272, bodyName: "B", startsAt: "2026-09-20T13:30:00-05:00" });
+    await t.mutation(internal.legistar.upsertEventItem, { ...item, eventId: 1 });
+    vi.useFakeTimers();
+    emptyLegistar();
+    await t.action(internal.sync.syncEvents, { since: "2026-09-01", until: "2026-10-31", bodyIds: [272] });
+    expect((await items(t))[0].removedAt).toBeUndefined();
+    expect(await runs(t)).toEqual([expect.objectContaining({ ok: false, scope: "top" })]);
   });
 });
 

@@ -98,11 +98,17 @@ export const upsertEventItem = internalMutation({
 });
 
 // Marks stored items of an event that upstream no longer lists. Never deletes; keeps the first removedAt.
+// An empty list for an event with live items is far likelier a bad Legistar reply than a fully withdrawn agenda,
+// so it is refused (the caller records the failure) unless the whole event was dropped from Legistar's list.
 export const markEventItemsRemoved = internalMutation({
-  args: { eventId: v.number(), presentIds: v.array(v.number()), at: v.number() },
-  handler: async (ctx, { eventId, presentIds, at }) => {
+  args: { eventId: v.number(), presentIds: v.array(v.number()), at: v.number(), eventDropped: v.optional(v.boolean()) },
+  handler: async (ctx, { eventId, presentIds, at, eventDropped }) => {
     const present = new Set(presentIds);
     const rows = await ctx.db.query("eventItems").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
+    const live = rows.filter((r) => r.removedAt === undefined).length;
+    if (!presentIds.length && live && !eventDropped) {
+      throw new Error(`Legistar returned no items for event ${eventId} but ${live} are stored; removals skipped`);
+    }
     for (const r of rows) if (!present.has(r.legistarId) && r.removedAt === undefined) await ctx.db.patch(r._id, { removedAt: at });
   },
 });

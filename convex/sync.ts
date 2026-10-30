@@ -69,10 +69,15 @@ export const syncEvents = internalAction({
       // A cancelled meeting disappears from Legistar's list but not from our table: mark its items removed (the
       // normal upsert clears the mark if it comes back). Only events in this window and these bodies are considered.
       const returned = new Set(raw.map((r) => r.EventId as number));
-      for (const eventId of await ctx.runQuery(internal.legistar.eventIdsInWindow, { since, until: end, bodyIds })) {
+      const stored = await ctx.runQuery(internal.legistar.eventIdsInWindow, { since, until: end, bodyIds });
+      // An empty list for a window we hold meetings in is far likelier a bad reply than every meeting cancelled.
+      if (!raw.length && stored.length) {
+        throw new Error(`Legistar returned no events but ${stored.length} are stored in the window; removals skipped`);
+      }
+      for (const eventId of stored) {
         if (returned.has(eventId)) continue;
         await c.attempt(`dropped event ${eventId}`, async () => {
-          await ctx.runMutation(internal.legistar.markEventItemsRemoved, { eventId, presentIds: [], at: Date.now() });
+          await ctx.runMutation(internal.legistar.markEventItemsRemoved, { eventId, presentIds: [], at: Date.now(), eventDropped: true });
         });
       }
     });
