@@ -48,9 +48,9 @@ describe("zoning glossary", () => {
     expect(block!).toContain(norm(e.officialText));
   });
 
-  it.each(entries)("%s: plain draft is short, unapproved by default", (_k, e) => {
+  it.each(entries)("%s: plain line is short and approved by Tarik (2026-10-29)", (_k, e) => {
     expect(e.plain.trim().split(/\s+/).length).toBeLessThanOrEqual(30);
-    expect(e.approved).toBe(false);
+    expect(e.approved).toBe(true);
     expect(e.plain).not.toMatch(/\b(good|bad|best|worst|should|unfortunately|controversial|unfair)\b/i);
   });
 
@@ -85,11 +85,11 @@ describe("hyphen normalization", () => {
 });
 
 describe("lookup", () => {
-  it("never returns an unapproved plain line", () => {
-    for (const [k] of entries) {
+  it("returns each approved plain line", () => {
+    for (const [k, e] of entries) {
       const r = lookup(k);
       expect(r, k).not.toBeNull();
-      expect(r!.plain).toBeNull();
+      expect(r!.plain).toBe(e.plain);
       expect(r!.officialText.length).toBeGreaterThan(0);
     }
   });
