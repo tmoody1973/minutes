@@ -47,7 +47,7 @@ describe("filesNear", () => {
     const r = await t.query(api.near.filesNear, { ...CENTER, filter: "all" });
     expect(r.map((x) => x.fileNumber)).toEqual(["A2", "A7", "A1"]);
     expect(r.map((x) => x.distanceMi)).toEqual([0.1, 0.2, 0.3]);
-    expect(r[0]).toMatchObject({ matterId: 2, title: REZ, statusName: "Passed" });
+    expect(r[0]).toMatchObject({ matterId: 2, title: REZ, statusName: "Passed", kind: "rezoning" });
   });
   it("nextHearing is the earliest future non-removed event item", async () => {
     const t = await seed();

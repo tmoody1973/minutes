@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Public_Sans } from "next/font/google";
+import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
 const publicSans = Public_Sans({
@@ -21,7 +22,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${publicSans.variable} ${plexMono.variable} antialiased`}>
-      <body className="min-h-dvh font-sans">{children}</body>
+      <body className="min-h-dvh font-sans">
+        <ConvexClientProvider>{children}</ConvexClientProvider>
+      </body>
     </html>
   );
 }

@@ -80,7 +80,9 @@ export default defineSchema({
       reason: v.optional(v.union(v.literal("no-color-box"), v.literal("sam-no-match"))),
       checkedAt: v.number(),
     })),
-  }).index("by_legistarId", ["legistarId"]),
+  })
+    .index("by_legistarId", ["legistarId"])
+    .index("by_fileNumber", ["fileNumber"]),
   // Slim read model for near-me: one row per zoning-kind matter that has at least one parcel centroid.
   // Maintained by upsertMatter / setMatterParcels (convex/locations.ts); no polygons, so reads stay small.
   matterLocations: defineTable({

@@ -35,13 +35,13 @@ export function Icon({ name, size = 22 }: { name: NavIcon; size?: number }) {
   );
 }
 
-// Laptop header nav (MinLaptopTracker): current item gets the blue underline bar.
-export function TopNav() {
-  const pathname = usePathname();
+// Laptop header nav (MinLaptopTracker): current item gets the blue underline bar. pathname null = not known yet
+// (the Suspense fallback on routes whose URL varies): same links, none marked current.
+export function TopNav({ pathname }: { pathname: string | null }) {
   return (
     <nav aria-label="Main" className="hidden md:flex md:flex-wrap md:gap-0.5">
       {NAV.map(({ href, label }) => {
-        const current = isActive(pathname, href);
+        const current = pathname !== null && isActive(pathname, href);
         return (
           <Link
             key={href}
@@ -60,15 +60,14 @@ export function TopNav() {
 }
 
 // Phone bottom nav (MinPhoneHome): fixed, four equal tabs, icon over label.
-export function BottomNav() {
-  const pathname = usePathname();
+export function BottomNav({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-10 flex border-t border-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {NAV.map(({ href, label, icon }) => {
-        const current = isActive(pathname, href);
+        const current = pathname !== null && isActive(pathname, href);
         return (
           <Link
             key={href}
@@ -85,4 +84,13 @@ export function BottomNav() {
       })}
     </nav>
   );
+}
+
+// Reads the URL, so the layout renders these inside <Suspense> with the pathname-less versions as fallback.
+export function CurrentTopNav() {
+  return <TopNav pathname={usePathname()} />;
+}
+
+export function CurrentBottomNav() {
+  return <BottomNav pathname={usePathname()} />;
 }

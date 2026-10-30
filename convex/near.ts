@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation, query } from "./_generated/server";
 import { NEAR_KINDS } from "./locations";
-import { distanceMiles, geocodeUserAddress, MAX_GEOCODE_INPUT } from "../lib/geo/near";
+import { distanceMiles, geocodeTyped, MAX_GEOCODE_INPUT } from "../lib/geo/near";
 
 // Legistar statusName values that mean the file is finished. Real dev values seen: "Passed", "Placed On File",
 // "In Council-Placed on File". Pending council steps ("In Council-Adoption"), "Confirmed" and "Dead" are NOT listed:
@@ -34,7 +34,7 @@ export const takeGeocodeToken = internalMutation({
   },
 });
 
-// Public: geocodes a typed address (never logged), at most 60 per minute across all callers; over that -> "busy".
+// Public: geocodes a typed address (never logged; city records first, then Census), at most 60 per minute across all callers; over that -> "busy".
 export const geocode = action({
   args: { text: v.string() },
   handler: async (ctx, { text }) => {
@@ -42,7 +42,7 @@ export const geocode = action({
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > MAX_GEOCODE_INPUT) return { error: "not-found" as const };
     if (!(await ctx.runMutation(internal.near.takeGeocodeToken, {}))) return { error: "busy" as const };
-    return geocodeUserAddress(text);
+    return geocodeTyped(text);
   },
 });
 
@@ -86,6 +86,7 @@ export const filesNear = query({
         matterId: m.matterId,
         fileNumber: m.fileNumber,
         title: m.title,
+        kind: m.kind,
         statusName: m.statusName,
         distanceMi: Math.round(d * 100) / 100,
         ...(next && { nextHearing: { date: next.date, body: next.body, eventId: next.eventId } }),

@@ -19,3 +19,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: https://ci-placeholder.convex.cloud

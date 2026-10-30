@@ -63,3 +63,29 @@ export function extractAddresses(title: string): Address[] {
   }
   return out;
 }
+
+// Street types as residents type them (full word or common abbreviation) -> MPROP code.
+const TYPED_TYPES: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(TYPES).map(([word, code]) => [word.toUpperCase(), code])),
+  AVE: "AV", AV: "AV", ST: "ST", PL: "PL", BLVD: "BL", BL: "BL", DR: "DR", RD: "RD", CT: "CT", LN: "LA", LA: "LA",
+  PKWY: "PK", PK: "PK", WY: "WY", TER: "TR", TR: "TR",
+};
+const TYPED_RE = /^(\d{1,5})\s+(N|S|E|W|NORTH|SOUTH|EAST|WEST)\s+(.+)$/;
+
+/**
+ * A resident's typed address ("711 E Kilbourn Ave", "711 East Kilbourn Avenue, Milwaukee, WI 53202") -> Address,
+ * or null when it is not a numbered street address with a direction (the caller then uses another geocoder).
+ * Only a trailing "Milwaukee [WI]" or ZIP is dropped without a comma: "1 W Wisconsin" is a street, not the state.
+ */
+export function parseTypedAddress(text: string): Address | null {
+  const line = text.split(",")[0].toUpperCase().replace(/\./g, "").replace(/\s+/g, " ").trim()
+    .replace(/(?:\s+MILWAUKEE(?:\s+(?:WI|WISCONSIN))?)?(?:\s+\d{5}(?:-\d{4})?)?$/, "")
+    .trim();
+  const m = TYPED_RE.exec(line);
+  if (!m) return null;
+  const words = m[3].split(" ");
+  const type = TYPED_TYPES[words[words.length - 1]];
+  const street = (type ? words.slice(0, -1) : words).join(" ");
+  if (!street || !/^[A-Z0-9 -]{1,40}$/.test(street)) return null;
+  return { houseNumber: Number(m[1]), dir: m[2][0] as Address["dir"], street, ...(type && { type }) };
+}
