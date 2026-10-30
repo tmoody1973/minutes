@@ -109,7 +109,7 @@ Raw per-chunk transcripts in `data/transcripts/{EventId}/chunk_NNN.json` (each h
 - Exact data model, building on `minutes.md` section 8.
 
 **Claude's calls (made while writing this; Tarik to check):**
-- **"Watch this moment" uses the city's Granicus player** at the turn's timestamp (`starttime` parameter), embedded where the player allows it, otherwise linked. We do not host meeting audio or video ourselves (consistent with decision 001). Trade-off: the transcript can't scroll along with playback. Clicking a turn re-cues the player instead.
+- **"Watch this moment" uses the city's Granicus player** at the turn's timestamp (`entrytime` parameter; `starttime` is ignored by the player, checked in a browser 2026-10-30), embedded where the player allows it, otherwise linked. We do not host meeting audio or video ourselves (consistent with decision 001). Trade-off: the transcript can't scroll along with playback. Clicking a turn re-cues the player instead.
 - Tallies are computed from per-person votes (section 3), since Legistar's tally fields are empty.
 - Untranscribed meetings show the city's machine captions, labeled as such, rather than nothing.
 

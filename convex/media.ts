@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { sourceDocs } from "../lib/ui/file";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { nameSpeakers } from "../lib/media/speakers";
 import type { SpeakerAssignment, Turn } from "../lib/types";
@@ -214,10 +215,67 @@ export const meetingView = query({
     ];
     const names = new Map(nameSpeakers(turns, accepted, overrides.filter((o) => o.hidden).map((o) => o.label)).map((n) => [n.turnKey, n]));
     const chapters = await ctx.db.query("chapters").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect();
+    // For the meeting page: the meeting itself, each chapter's agenda item, and every member's vote on it.
+    const event = await ctx.db.query("events").withIndex("by_legistarId", (q) => q.eq("legistarId", eventId)).unique();
+    const items = new Map(
+      (await ctx.db.query("eventItems").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect()).map((i) => [i.legistarId, i]),
+    );
+    const withItems = await Promise.all(chapters.map(async (c) => {
+      const i = items.get(c.eventItemId);
+      // Sorted by name: a neutral order with no special place for any member (Global Constraints).
+      const votes = (await ctx.db.query("votes").withIndex("by_eventItem", (q) => q.eq("eventItemId", c.eventItemId)).collect())
+        .map((v) => ({ personId: v.personId, name: v.personName, value: v.value }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      // The file's staff report and latest Exhibit A, as on the project page.
+      const matter = i?.matterId === undefined ? null : await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", i.matterId!)).unique();
+      return {
+        eventItemId: c.eventItemId,
+        startMs: c.startMs ?? null,
+        endMs: c.endMs ?? null,
+        located: c.located,
+        parts: c.parts,
+        sequence: i?.sequence ?? null,
+        item: i
+          ? {
+              title: i.title,
+              ...(i.fileNumber !== undefined && { fileNumber: i.fileNumber }),
+              ...(i.matterId !== undefined && { matterId: i.matterId }),
+              ...(i.actionName !== undefined && { actionName: i.actionName }),
+              ...(i.passed !== undefined && { passed: i.passed }),
+              ...(i.tally !== undefined && { tally: i.tally }),
+            }
+          : null,
+        votes,
+        docs: sourceDocs(matter?.attachments ?? []),
+      };
+    }));
+    // Agenda order; items the recording could not place keep their agenda position.
+    withItems.sort((a, b) => (a.sequence ?? Infinity) - (b.sequence ?? Infinity) || (a.startMs ?? Infinity) - (b.startMs ?? Infinity));
     return {
       transcriptSource: (rows[0]?.source ?? "none") as "transcript" | "captions" | "none",
+      event: event
+        ? { bodyName: event.bodyName, startsAt: event.startsAt, clipId: event.clipId ?? null, agendaUrl: event.agendaUrl ?? null, minutesUrl: event.minutesUrl ?? null }
+        : null,
       turns: turns.map((t, i) => ({ source: rows[i].source, turnKey: t.turnKey, startMs: t.startMs, endMs: t.endMs, text: t.text, label: t.label, display: names.get(t.turnKey)!.display, asHeard: names.get(t.turnKey)!.asHeard })),
-      chapters: chapters.map((c) => ({ eventItemId: c.eventItemId, startMs: c.startMs ?? null, endMs: c.endMs ?? null, located: c.located, parts: c.parts })),
+      chapters: withItems,
     };
+  },
+});
+
+// Read-only. Meetings with chapters (the ones Minutes has processed), newest first.
+export const meetingList = query({
+  args: {},
+  handler: async (ctx) => {
+    const counts = new Map<number, number>();
+    // ponytail: full chapters scan; a few dozen rows per meeting, fine until hundreds of meetings are processed.
+    for (const c of await ctx.db.query("chapters").collect()) counts.set(c.eventId, (counts.get(c.eventId) ?? 0) + 1);
+    const out = [];
+    for (const [eventId, chapters] of counts) {
+      const ev = await ctx.db.query("events").withIndex("by_legistarId", (q) => q.eq("legistarId", eventId)).unique();
+      if (!ev) continue;
+      const first = await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).first();
+      out.push({ eventId, bodyName: ev.bodyName, startsAt: ev.startsAt, chapters, transcriptSource: (first?.source ?? "none") as "transcript" | "captions" | "none" });
+    }
+    return out.sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   },
 });
