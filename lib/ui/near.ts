@@ -1,5 +1,6 @@
 // Display helpers for the Near me page (mockup MinLaptopTracker). Pure: safe in client and server code.
 import { type Address, extractAddresses } from "../geo/address";
+import { label as timelineLabel } from "../timeline/build";
 
 export type NearFilter = "upcoming" | "decided" | "all";
 
@@ -40,8 +41,8 @@ const KINDS: Record<string, string> = {
 };
 export const kindLabel = (kind: string) => KINDS[kind] ?? "ZONING";
 
-// Legistar sends body names in capitals; "committee" stays lowercase as in the mockup.
-export const bodyLabel = (name: string) => titleCase(name).replace(/ Committee$/, " committee");
+// Legistar sends body names in capitals; same labels as the project page timeline.
+export const bodyLabel = timelineLabel;
 
 export function hearingLabel(next: { date: string; body: string }): string {
   const day = new Date(next.date).toLocaleDateString("en-US", {

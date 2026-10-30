@@ -93,21 +93,30 @@ export const commentPage = (body: string, confirmed: Readonly<Record<string, boo
 const icsText = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
 const icsTime = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
+// RFC 5545: lines over 75 characters continue on the next line after a leading space.
+// ponytail: counts characters, not octets; exact for the ASCII these records carry.
+const fold = (line: string) => line.match(/^.{1,75}|.{1,74}/g)!.join("\r\n ");
+
 // Add-to-calendar file for the next hearing. No end time or location: the records give neither reliably.
-export function hearingIcs(h: { fileNumber: string; heading: string; body: string; startsAt: string; eventId: number; pageUrl: string }): string {
+export function hearingIcs(
+  h: { fileNumber: string; heading: string; body: string; startsAt: string; eventId: number; pageUrl: string },
+  now: Date,
+): string {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Minutes//Milwaukee City Hall//EN",
     "BEGIN:VEVENT",
     `UID:minutes-${h.eventId}-${h.fileNumber}@minutes`,
-    `DTSTAMP:${icsTime(h.startsAt)}`,
+    `DTSTAMP:${icsTime(now.toISOString())}`,
     `DTSTART:${icsTime(h.startsAt)}`,
     `SUMMARY:${icsText(`${h.body}: file ${h.fileNumber}, ${h.heading}`)}`,
     `DESCRIPTION:${icsText(`Public record and how to take part: ${h.pageUrl}`)}`,
     `URL:${h.pageUrl}`,
     "END:VEVENT",
     "END:VCALENDAR",
-    "",
-  ].join("\r\n");
+  ]
+    .map(fold)
+    .join("\r\n")
+    .concat("\r\n");
 }

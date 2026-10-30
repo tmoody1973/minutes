@@ -3,11 +3,12 @@
 import { useQuery } from "convex/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../../lib/ui/file";
-import { kindLabel, placeHeading } from "../../../../lib/ui/near";
+import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
 import { parseZoningChange } from "../../../../lib/zoning/change";
 
@@ -37,10 +38,25 @@ export function FileClient() {
   return <FileView view={view} />;
 }
 
+// Current time as state, refreshed each minute, so render stays pure and an open page notices a hearing starting.
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 function FileView({ view }: { view: View }) {
   const { matter, timeline, parcels } = view;
+  const now = useNow();
   const heading = placeHeading(matter.title, matter.fileNumber);
-  const next = timeline.find((s) => s.upcoming);
+  // Re-checked against the clock: Convex re-runs fileView only when data changes, not as time passes, so a
+  // stored `upcoming` can outlive the hearing.
+  const next = timeline.find((s): s is Step & { startsAt: string; eventId: number } =>
+    s.upcoming && s.startsAt !== undefined && s.eventId !== undefined && Date.parse(s.startsAt) > now,
+  );
   const districts = [...new Set(parcels.map((p) => p.alder).filter((a) => a !== null))];
   const label = [kindLabel(parseZoningChange(matter.title).kind), districts.length === 1 && `DISTRICT ${districts[0]}`, `FILE ${matter.fileNumber}`]
     .filter(Boolean)
@@ -48,45 +64,42 @@ function FileView({ view }: { view: View }) {
   const purpose = purposeLine(matter.title);
 
   return (
-    // Phone: one column in the mockup's order (order-N). Laptop: two independent stacks, so a tall section in one
-    // column never leaves a gap in the other.
-    <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-5">
-      <div className="contents md:flex md:flex-col md:gap-5">
-        <section className="order-1 flex flex-col gap-2">
-          <span className={mono}>{label}</span>
-          <h1 className="text-[28px] font-extrabold leading-[1.15] md:text-[32px]">{heading}</h1>
-          {purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>}
-          {next ? (
-            <span className="flex items-center gap-2 self-start rounded-2xl bg-amber-bg px-3 py-1.5 text-sm font-bold text-amber-fg">
-              <span aria-hidden="true" className="size-2 rounded-full bg-amber" />
-              Next: {next.body}, {stepDate(next.date, next.startsAt)}
-            </span>
-          ) : (
-            <span className="self-start rounded-2xl bg-map px-3 py-1.5 text-sm font-bold text-ink">{matter.statusName}</span>
-          )}
-        </section>
-
-        <Process timeline={timeline} />
-        <FullRecord view={view} />
-      </div>
-      <div className="contents md:flex md:flex-col md:gap-5">
-        <LotOutline parcels={parcels} />
-        <WhatWouldChange title={matter.title} zoningNow={[...new Set(parcels.map((p) => p.zoning).filter((z) => z !== null))]} />
-        {next?.startsAt && next.eventId !== undefined && (
-          <HowToBeHeard next={next as Step & { startsAt: string; eventId: number }} fileNumber={matter.fileNumber} heading={heading} />
+    // One column at every width, in the mockup's phone order: reading, tab and screen-reader order all match.
+    <div className="flex max-w-3xl flex-col gap-4 md:gap-5">
+      <section aria-labelledby="file-heading" className="flex flex-col gap-2">
+        <span className={mono}>{label}</span>
+        <h1 id="file-heading" className="text-[28px] font-extrabold leading-[1.15] md:text-[32px]">
+          {heading}
+        </h1>
+        {purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>}
+        {next ? (
+          <a
+            href="#next-hearing"
+            className="flex min-h-11 items-center gap-2 self-start rounded-2xl bg-amber-bg px-3 text-sm font-bold text-amber-fg no-underline hover:text-ink"
+          >
+            <span aria-hidden="true" className="size-2 rounded-full bg-amber" />
+            Next: {next.body}, {stepDate(next.date, next.startsAt)}
+          </a>
+        ) : (
+          <span className="self-start rounded-2xl bg-map px-3 py-1.5 text-sm font-bold text-ink">{matter.statusName}</span>
         )}
-        <Sources view={view} />
-      </div>
+      </section>
+      <LotOutline parcels={parcels} heading={heading} />
+      <WhatWouldChange title={matter.title} zoningNow={[...new Set(parcels.map((p) => p.zoning).filter((z) => z !== null))]} />
+      <Process timeline={timeline} />
+      {next && <HowToBeHeard next={next} fileNumber={matter.fileNumber} heading={heading} now={now} />}
+      <Sources view={view} />
+      <FullRecord view={view} />
     </div>
   );
 }
 
-function LotOutline({ parcels }: { parcels: View["parcels"] }) {
+function LotOutline({ parcels, heading }: { parcels: View["parcels"]; heading: string }) {
   const svg = outlineSvg(parcels.map((p) => p.polygon), 358, 170, 16);
   if (!svg) return null;
   return (
-    <section aria-label="Where it is" className={`${card} order-2 overflow-hidden`}>
-      <svg viewBox="0 0 358 170" role="img" aria-label="Outline of the project's lots" className="block h-auto w-full bg-map">
+    <section aria-label="Where it is" className={`${card} overflow-hidden`}>
+      <svg viewBox="0 0 358 170" role="img" aria-label={`Lot outline, ${heading}`} className="block h-auto max-h-56 w-full bg-map">
         {svg.paths.map((d) => (
           <path key={d} d={d} fill="var(--color-tint)" stroke="var(--color-link)" strokeWidth="2.5" strokeDasharray="6 4" strokeLinejoin="round" />
         ))}
@@ -102,13 +115,15 @@ function WhatWouldChange({ title, zoningNow }: { title: string; zoningNow: strin
   const proposed = lookup(to);
   const now = zoningNow.length === 1 ? lookup(zoningNow[0]) : null;
   return (
-    <section aria-label="What would change" className={`${card} order-3 flex flex-col gap-3 p-4`}>
-      <h2 className="text-[17px] font-extrabold">What would change</h2>
+    <section aria-labelledby="change-heading" className={`${card} flex flex-col gap-3 p-4`}>
+      <h2 id="change-heading" className="text-[17px] font-extrabold">
+        What would change
+      </h2>
       <div className="flex items-center gap-2.5">
         {zoningNow.length > 0 && (
           <>
             <div className="flex flex-1 flex-col gap-0.5 rounded-[10px] bg-paper p-2.5">
-              <span className="font-mono text-[10px] font-semibold tracking-[0.06em] text-muted">ZONED NOW</span>
+              <span className="font-mono text-[11px] font-semibold tracking-[0.06em] text-muted">ZONED NOW</span>
               <span className="text-[15px] font-bold">{zoningNow.join(", ")}</span>
               {now && <span className="text-[13px] text-muted">{now.term}</span>}
             </div>
@@ -118,7 +133,7 @@ function WhatWouldChange({ title, zoningNow }: { title: string; zoningNow: strin
           </>
         )}
         <div className="flex flex-1 flex-col gap-0.5 rounded-[10px] bg-tint p-2.5">
-          <span className="font-mono text-[10px] font-semibold tracking-[0.06em] text-link">PROPOSED</span>
+          <span className="font-mono text-[11px] font-semibold tracking-[0.06em] text-link">PROPOSED</span>
           <span className="text-[15px] font-bold">{proposed?.code ?? to}</span>
           {proposed && <span className="text-[13px] text-muted">{proposed.term}</span>}
         </div>
@@ -135,8 +150,10 @@ function WhatWouldChange({ title, zoningNow }: { title: string; zoningNow: strin
 
 function Process({ timeline }: { timeline: Step[] }) {
   return (
-    <section aria-label="Where it is in the process" className={`${card} order-4 flex flex-col p-4`}>
-      <h2 className="mb-3 text-[17px] font-extrabold">Where it is in the process</h2>
+    <section aria-labelledby="process-heading" className={`${card} flex flex-col p-4`}>
+      <h2 id="process-heading" className="mb-3 text-[17px] font-extrabold">
+        Where it is in the process
+      </h2>
       <ol>
         {timeline.map((s, i) => {
           const last = i === timeline.length - 1;
@@ -169,6 +186,9 @@ function Process({ timeline }: { timeline: Step[] }) {
                       <path d="M8 5v14l11-7z" />
                     </svg>
                     Watch this item
+                    <span className="sr-only">
+                      : {s.body}, {stepDate(s.date)}
+                    </span>
                   </a>
                 )}
               </div>
@@ -180,12 +200,26 @@ function Process({ timeline }: { timeline: Step[] }) {
   );
 }
 
-function HowToBeHeard({ next, fileNumber, heading }: { next: Step & { startsAt: string; eventId: number }; fileNumber: string; heading: string }) {
+function HowToBeHeard({
+  next,
+  fileNumber,
+  heading,
+  now,
+}: {
+  next: Step & { startsAt: string; eventId: number };
+  fileNumber: string;
+  heading: string;
+  now: number;
+}) {
   const page = commentPage(next.body);
-  const ics = hearingIcs({ fileNumber, heading, body: next.body, startsAt: next.startsAt, eventId: next.eventId, pageUrl: window.location.href });
+  // Browser-only render (see FileView), so window is defined.
+  const ics = hearingIcs({ fileNumber, heading, body: next.body, startsAt: next.startsAt, eventId: next.eventId, pageUrl: window.location.href }, new Date(now));
   return (
-    <section aria-label="How to be heard" className={`${card} order-5 flex flex-col gap-3 p-4`}>
-      <h2 className="text-[17px] font-extrabold">How to be heard</h2>
+    <section id="next-hearing" aria-labelledby="hearing-heading" className={`${card} flex scroll-mt-4 flex-col gap-3 p-4`}>
+      {/* The heading promises instructions only when a confirmed city page backs it. */}
+      <h2 id="hearing-heading" className="text-[17px] font-extrabold">
+        {page ? "How to be heard" : "Next hearing"}
+      </h2>
       <p className="text-[15px]">
         {next.body} takes this up on <span className="font-bold text-amber-fg">{stepDate(next.date, next.startsAt)}</span>.
       </p>
@@ -211,8 +245,10 @@ function Sources({ view }: { view: View }) {
   const docs = sourceDocs(view.attachments);
   if (!docs.length) return null;
   return (
-    <section aria-label="Sources" className="order-6 flex flex-col gap-2">
-      <h2 className={mono}>SOURCES</h2>
+    <section aria-labelledby="sources-heading" className="flex flex-col gap-2">
+      <h2 id="sources-heading" className={mono}>
+        SOURCES
+      </h2>
       <div className="flex flex-wrap gap-2">
         {docs.map((d) => (
           <a key={d.label} href={d.hyperlink} className={chip}>
@@ -226,20 +262,25 @@ function Sources({ view }: { view: View }) {
 
 function FullRecord({ view }: { view: View }) {
   return (
-    <details className={`${card} p-4 order-7`}>
-      <summary className="flex min-h-11 cursor-pointer items-center text-[17px] font-extrabold">
-        Full record: {view.histories.length} actions, {view.attachments.length} documents
+    <details className={`${card} group p-4`}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <h2 className="text-[17px] font-extrabold">
+          Full record: {view.histories.length} actions, {view.attachments.length} documents
+        </h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none group-open:rotate-180">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </summary>
       <h3 className={`${mono} mt-3`}>EVERY ACTION, FROM LEGISTAR</h3>
-      <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
+      <ul className="mt-2 flex max-w-[75ch] flex-col gap-1.5 text-[15px]">
         {view.histories.map((h, i) => (
           <li key={i}>
-            <span className="text-muted">{stepDate(h.date.slice(0, 10))}</span> · {h.bodyName} · {actionText([h.actionName])}
+            <span className="text-muted">{stepDate(h.date.slice(0, 10))}</span> · {bodyLabel(h.bodyName)} · {actionText([h.actionName])}
           </li>
         ))}
       </ul>
       <h3 className={`${mono} mt-4`}>DOCUMENTS</h3>
-      <ul className="mt-1 flex flex-col">
+      <ul className="mt-1 flex max-w-[75ch] flex-col">
         {view.attachments.map((a) => (
           <li key={a.hyperlink}>
             <a href={a.hyperlink} className="flex min-h-11 items-center text-[15px] font-semibold">

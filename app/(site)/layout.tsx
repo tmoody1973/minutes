@@ -14,6 +14,12 @@ async function WeekOf() {
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-dvh flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+      <a
+        href="#main"
+        className="sr-only z-20 rounded-lg bg-ink px-4 py-3 font-bold text-white focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:text-white"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1360px] flex-wrap items-center gap-x-6 gap-y-2.5 px-4 pb-3 pt-4 md:justify-between md:px-7 md:py-2.5">
           <Link href="/" className="flex items-baseline gap-2.5 py-1 text-ink no-underline">
@@ -34,7 +40,7 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1360px] flex-1 flex-col gap-4 px-4 py-4 md:px-7 md:pb-10 md:pt-6">{children}</main>
+      <main id="main" tabIndex={-1} className="mx-auto flex w-full max-w-[1360px] flex-1 flex-col gap-4 px-4 py-4 md:px-7 md:pb-10 md:pt-6">{children}</main>
 
       {/* ponytail: voice slot. Ask by voice (M8, should-tier) mounts above the bottom nav here; nothing renders until it ships. */}
       <footer className="mx-auto w-full max-w-[1360px] px-4 pb-6 md:px-7">

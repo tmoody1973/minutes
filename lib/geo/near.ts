@@ -34,7 +34,8 @@ interface CensusMatch {
 
 // Census returns nothing for a street-only line. Minutes covers one city, so a line naming no city, state or ZIP
 // is looked up in Milwaukee; "Wisconsin Ave" is a street, not the state. outside-milwaukee still guards other cities.
-const NAMES_PLACE = /\bmilwaukee\b|,\s*(?:wi|wisconsin)\b|\bwi\s*$|\b\d{5}(?:-\d{4})?\s*$/i;
+// Any comma counts as naming a place ("..., Wauwatosa"), so a place the resident typed is never overridden.
+const NAMES_PLACE = /,|\bmilwaukee\b|\bwi\s*$|\b\d{5}(?:-\d{4})?\s*$/i;
 const withCity = (address: string) => (NAMES_PLACE.test(address) ? address : `${address}, Milwaukee, WI`);
 
 const placeOf = (m: CensusMatch): string | null => m.geographies?.["Incorporated Places"]?.[0]?.NAME ?? null;
@@ -70,15 +71,30 @@ export async function geocodeUserAddress(text: string, opts: GeocodeOptions = {}
   return { lat: y, lng: x, matchedAddress: first.matchedAddress };
 }
 
+const CITY_TIMEOUT_MS = 5_000;
+
+// City records cover Milwaukee only. A typed other city ("..., Pewaukee, WI") or a non-532xx ZIP must not be
+// matched to a same-named Milwaukee street, so those go straight to Census (which can say outside-milwaukee).
+function mayBeMilwaukee(text: string): boolean {
+  const zip = /\b(\d{5})(?:-\d{4})?\s*$/.exec(text)?.[1];
+  if (zip && !zip.startsWith("532")) return false;
+  const rest = text.split(",").slice(1).join(" ").trim();
+  return !rest || /^(?:milwaukee)?[\s,]*(?:wi|wisconsin)?[\s,]*(?:\d{5}(?:-\d{4})?)?$/i.test(rest);
+}
+
 /**
  * City records first (decision 006): a parsed address that matches one lot in MPROP returns that lot's center and
  * alder district. Anything else (unparsed text, no lot, a city service failure) falls back to the Census geocoder.
  */
 export async function geocodeTyped(text: string, opts: GeocodeOptions = {}): Promise<GeocodeResult> {
-  const typed = parseTypedAddress(text);
+  const typed = mayBeMilwaukee(text) ? parseTypedAddress(text) : null;
   if (typed) {
+    // A person is waiting: city calls get 5 s each (the sync job's 20 s would stack to nearly a minute).
+    const base = opts.fetchImpl ?? ((u: string, i: RequestInit) => fetch(u, i));
+    const quick = (u: string, i: RequestInit) =>
+      base(u, { ...i, signal: AbortSignal.any([AbortSignal.timeout(CITY_TIMEOUT_MS), ...(i.signal ? [i.signal] : [])]) });
     try {
-      const { parcels, errors } = await resolveParcels([typed], { fetchImpl: opts.fetchImpl });
+      const { parcels, errors } = await resolveParcels([typed], { fetchImpl: quick });
       const lot = errors.length ? undefined : parcels.find((p) => p.centroid);
       if (lot?.centroid) {
         return { ...lot.centroid, matchedAddress: `${lot.address}, MILWAUKEE, WI`, ...(lot.alder !== null && { district: lot.alder }) };
