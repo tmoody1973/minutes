@@ -117,3 +117,61 @@ describe("meetingView source and automatic names", () => {
     expect(v.turns.map((x) => [x.display, x.asHeard])).toEqual([["Official Person", false], ["Resident Heard", true], ["Speaker A", false]]);
   });
 });
+
+describe("meetingView page fields", () => {
+  it("returns the event, each chapter's agenda item and its votes sorted by name; no extra treatment for anyone", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 13559, bodyId: 272, bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", clipId: 5310, agendaUrl: "https://x/agenda.pdf" });
+    await t.mutation(internal.legistar.upsertEventItem, {
+      legistarId: 495640, eventId: 13559, sequence: 5, matterId: 74560, fileNumber: "260533", title: "Bookends title", actionName: "APPROVED CONDITIONALLY", passed: true, videoStartSec: 2051,
+    });
+    await t.mutation(internal.legistar.setEventItemTally, { eventItemLegistarId: 495640, tally: { aye: 2, no: 0, excused: 1, other: 0 } });
+    await t.mutation(internal.legistar.replaceVotes, {
+      eventItemId: 495640,
+      votes: [
+        { eventItemId: 495640, personId: 3, personName: "Willie Smith", value: "Aye" },
+        { eventItemId: 495640, personId: 1, personName: "Tarik Moody", value: "Aye" },
+        { eventItemId: 495640, personId: 2, personName: "Allyson Nemec", value: "Excused" },
+      ],
+    });
+    await t.mutation(internal.legistar.upsertMatter, {
+      legistarId: 74560, fileNumber: "260533", title: "Bookends title", typeName: "Ordinance", statusName: "In Council-Passage",
+      attachments: [{ name: "Map", hyperlink: "https://x/map.pdf" }, { name: "CPC Staff Report", hyperlink: "https://x/staff.pdf" }, { name: "Exhibit A as of 09.25.26", hyperlink: "https://x/exa.pdf" }],
+    });
+    await t.mutation(internal.media.replaceChapters, { eventId: 13559, chapters: [{ eventItemId: 495640, startMs: 2051000, endMs: 5832000, located: "video-index", parts: [] }] });
+    const v = await t.query(api.media.meetingView, { eventId: 13559 });
+    expect(v.chapters[0].docs).toEqual([
+      { label: "Staff report", hyperlink: "https://x/staff.pdf" },
+      { label: "Exhibit A", hyperlink: "https://x/exa.pdf" },
+    ]);
+    expect(v.event).toMatchObject({ bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", clipId: 5310, agendaUrl: "https://x/agenda.pdf" });
+    expect(v.chapters[0].item).toMatchObject({ fileNumber: "260533", matterId: 74560, title: "Bookends title", actionName: "APPROVED CONDITIONALLY", passed: true, tally: { aye: 2, no: 0, excused: 1, other: 0 } });
+    expect(v.chapters[0].votes).toEqual([
+      { personId: 2, name: "Allyson Nemec", value: "Excused" },
+      { personId: 1, name: "Tarik Moody", value: "Aye" },
+      { personId: 3, name: "Willie Smith", value: "Aye" },
+    ]);
+  });
+  it("event is null and chapters carry no item for an unknown meeting", async () => {
+    const t = convexTest(schema, modules);
+    const v = await t.query(api.media.meetingView, { eventId: 999 });
+    expect(v.event).toBeNull();
+    expect(v.chapters).toEqual([]);
+  });
+});
+
+describe("meetingList", () => {
+  it("lists meetings that have chapters, newest first, with body, date, chapter count and transcript source", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 1, bodyId: 272, bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", clipId: 5310 });
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 2, bodyId: 1, bodyName: "COMMON COUNCIL", startsAt: "2026-10-13T09:00:00-05:00" });
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 3, bodyId: 11, bodyName: "ZND", startsAt: "2026-10-06T09:00:00-05:00" }); // no chapters
+    await t.mutation(internal.media.replaceChapters, { eventId: 1, chapters: [{ eventItemId: 10, located: "cue", parts: [] }, { eventItemId: 11, located: "cue", parts: [] }] });
+    await t.mutation(internal.media.replaceChapters, { eventId: 2, chapters: [{ eventItemId: 20, located: "cue", parts: [] }] });
+    await t.mutation(internal.media.upsertTurns, { eventId: 2, turns: [{ ...turn("cap:0", 0, undefined), source: "captions" as const }] });
+    expect(await t.query(api.media.meetingList, {})).toEqual([
+      { eventId: 2, bodyName: "COMMON COUNCIL", startsAt: "2026-10-13T09:00:00-05:00", chapters: 1, transcriptSource: "captions" },
+      { eventId: 1, bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", chapters: 2, transcriptSource: "none" },
+    ]);
+  });
+});
