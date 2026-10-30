@@ -2,7 +2,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { DISCLOSURE, weekOf } from "../../lib/ui/shell";
-import { BottomNav, Icon, TopNav } from "./_components/Nav";
+import { AddressChip } from "./_components/AddressChip";
+import { BottomNav, CurrentBottomNav, CurrentTopNav, TopNav } from "./_components/Nav";
 
 // Request time, not build time: the shell is prerendered, the date streams in (cacheComponents).
 async function WeekOf() {
@@ -24,16 +25,11 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
               <WeekOf />
             </Suspense>
           </span>
-          <TopNav />
-          {/* Address chip: shows the saved address, district and alder once Near me stores one (Task 4.2). */}
+          <Suspense fallback={<TopNav pathname={null} />}>
+            <CurrentTopNav />
+          </Suspense>
           <div className="basis-full md:basis-auto">
-            <Link
-              href="/near"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-sm font-semibold text-ink no-underline hover:border-ink hover:text-ink"
-            >
-              <Icon name="pin" size={14} />
-              Set your address
-            </Link>
+            <AddressChip />
           </div>
         </div>
       </header>
@@ -45,7 +41,9 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
         <p className="max-w-[65ch] text-xs leading-relaxed text-muted">{DISCLOSURE}</p>
       </footer>
 
-      <BottomNav />
+      <Suspense fallback={<BottomNav pathname={null} />}>
+        <CurrentBottomNav />
+      </Suspense>
     </div>
   );
 }

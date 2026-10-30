@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { distanceMiles, geocodeUserAddress } from "../../lib/geo/near";
+import { distanceMiles, geocodeTyped, geocodeUserAddress } from "../../lib/geo/near";
+import kilbourn from "../fixtures/mprop/mprop-kilbourn.json";
+import southgate from "../fixtures/mprop/mprop-southgate.json";
+import parcel3930942000 from "../fixtures/mprop/parcel-3930942000.json";
 
 const match = (place: string | null, x = -87.948564295808, y = 42.981547950886, addr = "3473 S 27TH ST, MILWAUKEE, WI, 53215") => ({
   matchedAddress: addr,
@@ -50,8 +53,64 @@ describe("geocodeUserAddress", () => {
     expect(await geocodeUserAddress("a".repeat(201), { fetchImpl: f })).toEqual({ error: "not-found" });
     expect(calls).toHaveLength(0);
   });
-  it("upstream failure or junk body is not-found", async () => {
-    expect(await geocodeUserAddress("x", { fetchImpl: async () => new Response("no", { status: 500 }) })).toEqual({ error: "not-found" });
+  it("Census outage (5xx, timeout, network) is unavailable, not a bad address", async () => {
+    expect(await geocodeUserAddress("x", { fetchImpl: async () => new Response("no", { status: 502 }) })).toEqual({ error: "unavailable" });
+    expect(await geocodeUserAddress("x", { fetchImpl: async () => { throw new DOMException("timed out", "TimeoutError"); } })).toEqual({ error: "unavailable" });
+    expect(await geocodeUserAddress("x", { fetchImpl: async () => { throw new TypeError("fetch failed"); } })).toEqual({ error: "unavailable" });
+  });
+  it("a 4xx or junk body is still not-found", async () => {
+    expect(await geocodeUserAddress("x", { fetchImpl: async () => new Response("no", { status: 400 }) })).toEqual({ error: "not-found" });
     expect(await geocodeUserAddress("x", { fetchImpl: async () => new Response("{}") })).toEqual({ error: "not-found" });
+  });
+  it("a street-only address is looked up in Milwaukee, WI (Census finds nothing without a city)", async () => {
+    const sent = async (text: string) => {
+      const calls: string[] = [];
+      await geocodeUserAddress(text, { fetchImpl: stub([match("Milwaukee city")], calls) });
+      return new URL(calls[0].split("|")[0]).searchParams.get("address");
+    };
+    expect(await sent("711 E Kilbourn Ave")).toBe("711 E Kilbourn Ave, Milwaukee, WI");
+    expect(await sent("711 E Kilbourn Ave Milwaukee")).toBe("711 E Kilbourn Ave Milwaukee");
+    expect(await sent("711 E Kilbourn Ave, WI")).toBe("711 E Kilbourn Ave, WI");
+    expect(await sent("711 E Kilbourn Ave 53202")).toBe("711 E Kilbourn Ave 53202");
+    expect(await sent("7700 W Wisconsin Ave")).toBe("7700 W Wisconsin Ave, Milwaukee, WI");
+  });
+});
+
+describe("geocodeTyped: city records first, Census as fallback", () => {
+  const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+  // Routes the city's MPROP (data.milwaukee.gov), the parcel map (milwaukeemaps) and Census by host; records hosts.
+  const route = (mprop: () => Response, census = () => json({ result: { addressMatches: [match("Milwaukee city")] } })) => {
+    const hosts: string[] = [];
+    const fetchImpl = async (url: string) => {
+      const host = new URL(url).host;
+      hosts.push(host);
+      if (host === "data.milwaukee.gov") return mprop();
+      if (host === "milwaukeemaps.milwaukee.gov") return json(parcel3930942000);
+      return census();
+    };
+    return { hosts, fetchImpl };
+  };
+
+  it("a parsed address found in city records uses the lot's center and alder district, no Census call", async () => {
+    const { hosts, fetchImpl } = route(() => json(kilbourn));
+    const r = await geocodeTyped("711 E Kilbourn Ave", { fetchImpl });
+    expect(r).toMatchObject({ matchedAddress: "711 E KILBOURN AV, MILWAUKEE, WI", district: 4 });
+    expect("lat" in r && Math.abs(r.lat - 43.0425) < 0.001 && Math.abs(r.lng + 87.9028) < 0.001).toBe(true);
+    expect(hosts).not.toContain("geocoding.geo.census.gov");
+  });
+  it("no lot at that number falls back to Census", async () => {
+    const { hosts, fetchImpl } = route(() => json(southgate));
+    expect(await geocodeTyped("711 E Kilbourn Ave", { fetchImpl })).toMatchObject({ matchedAddress: "3473 S 27TH ST, MILWAUKEE, WI, 53215" });
+    expect(hosts).toContain("geocoding.geo.census.gov");
+  });
+  it("a city service failure falls back to Census", async () => {
+    const { hosts, fetchImpl } = route(() => json("down", 503));
+    expect(await geocodeTyped("711 E Kilbourn Ave", { fetchImpl })).toMatchObject({ lat: 42.981547950886 });
+    expect(hosts).toContain("geocoding.geo.census.gov");
+  });
+  it("text the parser cannot read goes straight to Census", async () => {
+    const { hosts, fetchImpl } = route(() => json(kilbourn));
+    await geocodeTyped("Kilbourn and Van Buren", { fetchImpl });
+    expect(hosts).toEqual(["geocoding.geo.census.gov"]);
   });
 });

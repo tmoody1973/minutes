@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractAddresses } from "@/lib/geo/address";
+import { extractAddresses, parseTypedAddress } from "@/lib/geo/address";
 
 import titles from "../fixtures/legistar/zoning-titles.json";
 
@@ -84,4 +84,21 @@ describe("extractAddresses", () => {
     expect(extractAddresses("PHASE 1 North Plaza Court")).toEqual([]);
     expect(extractAddresses("LOT 7 North Plaza Court")).toEqual([]);
   });
+});
+
+describe("parseTypedAddress (what a resident types)", () => {
+  it.each([
+    ["711 E Kilbourn Ave", { houseNumber: 711, dir: "E", street: "KILBOURN", type: "AV" }],
+    ["711 East Kilbourn Avenue", { houseNumber: 711, dir: "E", street: "KILBOURN", type: "AV" }],
+    ["711 e. kilbourn av., Milwaukee, WI 53202", { houseNumber: 711, dir: "E", street: "KILBOURN", type: "AV" }],
+    ["3473 S 27th St", { houseNumber: 3473, dir: "S", street: "27TH", type: "ST" }],
+    ["822 N Van Buren St Milwaukee", { houseNumber: 822, dir: "N", street: "VAN BUREN", type: "ST" }],
+    ["2000 W Fond du Lac Ave", { houseNumber: 2000, dir: "W", street: "FOND DU LAC", type: "AV" }],
+    ["1 W Wisconsin", { houseNumber: 1, dir: "W", street: "WISCONSIN" }],
+    ["100 N Lincoln Memorial Dr", { houseNumber: 100, dir: "N", street: "LINCOLN MEMORIAL", type: "DR" }],
+  ])("%s", (text, want) => expect(parseTypedAddress(text)).toEqual(want));
+
+  it.each(["Kilbourn and Van Buren", "711 Kilbourn Ave", "", "E Kilbourn Ave", "711 E", "123456 E Main St"])("not parsed: %s", (text) =>
+    expect(parseTypedAddress(text)).toBeNull(),
+  );
 });

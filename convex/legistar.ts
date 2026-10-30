@@ -164,7 +164,8 @@ export const getMatterParcels = internalQuery({
 
 export const getMatterByFileNumber = internalQuery({
   args: { fileNumber: v.string() },
-  handler: async (ctx, { fileNumber }) => (await ctx.db.query("matters").filter((q) => q.eq(q.field("fileNumber"), fileNumber)).first()) ?? null,
+  handler: async (ctx, { fileNumber }) =>
+    (await ctx.db.query("matters").withIndex("by_fileNumber", (q) => q.eq("fileNumber", fileNumber)).first()) ?? null,
 });
 
 export const setExhibitCheck = internalMutation({

@@ -1,3 +1,6 @@
+import { parseTypedAddress } from "./address";
+import { resolveParcels } from "./mprop";
+
 const USER_AGENT = "Minutes/0.1 (tarik@radiomilwaukee.org)";
 const CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress";
 const EARTH_RADIUS_MI = 3958.8;
@@ -9,7 +12,8 @@ export interface LatLng {
   lng: number;
 }
 
-export type GeocodeResult = (LatLng & { matchedAddress: string }) | { error: "not-found" | "outside-milwaukee" };
+// "unavailable": Census failed (5xx, timeout, network), so the address itself may be fine.
+export type GeocodeResult = (LatLng & { matchedAddress: string; district?: number }) | { error: "not-found" | "outside-milwaukee" | "unavailable" };
 
 /** Great-circle distance in miles (haversine). */
 export function distanceMiles(a: LatLng, b: LatLng): number {
@@ -28,6 +32,11 @@ interface CensusMatch {
   geographies?: Record<string, { NAME?: string }[] | undefined>;
 }
 
+// Census returns nothing for a street-only line. Minutes covers one city, so a line naming no city, state or ZIP
+// is looked up in Milwaukee; "Wisconsin Ave" is a street, not the state. outside-milwaukee still guards other cities.
+const NAMES_PLACE = /\bmilwaukee\b|,\s*(?:wi|wisconsin)\b|\bwi\s*$|\b\d{5}(?:-\d{4})?\s*$/i;
+const withCity = (address: string) => (NAMES_PLACE.test(address) ? address : `${address}, Milwaukee, WI`);
+
 const placeOf = (m: CensusMatch): string | null => m.geographies?.["Incorporated Places"]?.[0]?.NAME ?? null;
 
 /**
@@ -38,19 +47,20 @@ export async function geocodeUserAddress(text: string, opts: GeocodeOptions = {}
   const address = text.trim();
   if (!address || address.length > MAX_GEOCODE_INPUT) return { error: "not-found" };
   const fetchImpl = opts.fetchImpl ?? ((u, i) => fetch(u, i));
-  const qs = new URLSearchParams({ address, benchmark: "Public_AR_Current", vintage: "Current_Current", layers: "Incorporated Places", format: "json" });
+  const qs = new URLSearchParams({ address: withCity(address), benchmark: "Public_AR_Current", vintage: "Current_Current", layers: "Incorporated Places", format: "json" });
   let matches: CensusMatch[];
   try {
     const res = await fetchImpl(`${CENSUS_URL}?${qs}`, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+    if (res.status >= 500) return { error: "unavailable" };
     if (!res.ok) return { error: "not-found" };
-    const body = (await res.json()) as { result?: { addressMatches?: CensusMatch[] } };
+    const body = (await res.json().catch(() => ({}))) as { result?: { addressMatches?: CensusMatch[] } };
     matches = body.result?.addressMatches ?? [];
   } catch {
-    // Deliberately not logged: the message could carry the typed address.
-    return { error: "not-found" };
+    // Network failure or timeout. Deliberately not logged: the message could carry the typed address.
+    return { error: "unavailable" };
   }
   const first = matches[0];
   const { x, y } = first?.coordinates ?? {};
@@ -58,4 +68,24 @@ export async function geocodeUserAddress(text: string, opts: GeocodeOptions = {}
   if (matches.some((m) => placeOf(m) !== placeOf(first))) return { error: "not-found" };
   if (placeOf(first) !== "Milwaukee city") return { error: "outside-milwaukee" };
   return { lat: y, lng: x, matchedAddress: first.matchedAddress };
+}
+
+/**
+ * City records first (decision 006): a parsed address that matches one lot in MPROP returns that lot's center and
+ * alder district. Anything else (unparsed text, no lot, a city service failure) falls back to the Census geocoder.
+ */
+export async function geocodeTyped(text: string, opts: GeocodeOptions = {}): Promise<GeocodeResult> {
+  const typed = parseTypedAddress(text);
+  if (typed) {
+    try {
+      const { parcels, errors } = await resolveParcels([typed], { fetchImpl: opts.fetchImpl });
+      const lot = errors.length ? undefined : parcels.find((p) => p.centroid);
+      if (lot?.centroid) {
+        return { ...lot.centroid, matchedAddress: `${lot.address}, MILWAUKEE, WI`, ...(lot.alder !== null && { district: lot.alder }) };
+      }
+    } catch {
+      // Deliberately not logged (could carry the address); Census gets a turn.
+    }
+  }
+  return geocodeUserAddress(text, opts);
 }
