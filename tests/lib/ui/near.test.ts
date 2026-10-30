@@ -25,7 +25,8 @@ describe("labels", () => {
   it("bodies read in normal case", () => {
     expect(bodyLabel("COMMON COUNCIL")).toBe("Common Council");
     expect(bodyLabel("CITY PLAN COMMISSION")).toBe("City Plan Commission");
-    expect(bodyLabel("ZONING, NEIGHBORHOODS & DEVELOPMENT COMMITTEE")).toBe("Zoning, Neighborhoods & Development committee");
+    // Same label the project page timeline uses (lib/timeline/build.ts).
+    expect(bodyLabel("ZONING, NEIGHBORHOODS & DEVELOPMENT COMMITTEE")).toBe("Zoning, Neighborhoods & Development");
   });
   it("hearing date is shown in Milwaukee time", () =>
     expect(hearingLabel({ date: "2026-11-04T09:00:00-06:00", body: "COMMON COUNCIL" })).toBe("Next: Common Council, Wed, Nov 4"));

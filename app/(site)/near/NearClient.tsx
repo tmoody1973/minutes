@@ -2,7 +2,7 @@
 
 import { useAction, useQuery } from "convex/react";
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import {
   distanceLabel,
@@ -24,26 +24,68 @@ const GEOCODE_ERRORS = {
   unavailable: "The address lookup service isn't responding. Try again in a minute.",
 } as const;
 
+const textButton = "min-h-11 font-semibold text-link underline underline-offset-[0.18em] hover:text-ink";
+
+// Focus follows the task for keyboard and screen-reader users: to the results after a lookup or cancel, to the
+// input after "Change address" or "Forget this address" (otherwise focus would drop to the page body).
 export function NearClient() {
   const place = useSavedPlace();
   const [editing, setEditing] = useState(false);
-  return place && !editing ? (
+  const [focus, setFocus] = useState<"results" | "input" | null>(null);
+  const nearRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (focus === "results" && place && !editing) nearRef.current?.focus();
+  }, [focus, place, editing]);
+
+  if (!place || editing) {
+    return (
+      <AddressForm
+        focusInput={focus === "input"}
+        onDone={() => {
+          setEditing(false);
+          setFocus("results");
+        }}
+        canCancel={!!place}
+      />
+    );
+  }
+  return (
     <>
-      <p className="text-[15px] text-muted">
+      <p ref={nearRef} tabIndex={-1} className="text-[15px] text-muted">
         Near <span className="font-semibold text-ink">{shortAddress(place.matchedAddress)}</span> ·{" "}
-        <button type="button" onClick={() => setEditing(true)} className="min-h-11 font-semibold text-link underline underline-offset-[0.18em] hover:text-ink">
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(true);
+            setFocus("input");
+          }}
+          className={textButton}
+        >
           Change address
+        </button>{" "}
+        ·{" "}
+        <button
+          type="button"
+          onClick={() => {
+            savePlace(null);
+            setFocus("input");
+          }}
+          className={textButton}
+        >
+          Forget this address
         </button>
       </p>
       <Results place={place} />
     </>
-  ) : (
-    <AddressForm onDone={() => setEditing(false)} canCancel={!!place} />
   );
 }
 
-function AddressForm({ onDone, canCancel }: { onDone: () => void; canCancel: boolean }) {
+function AddressForm({ onDone, canCancel, focusInput }: { onDone: () => void; canCancel: boolean; focusInput: boolean }) {
   const geocode = useAction(api.near.geocode);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusInput) inputRef.current?.focus();
+  }, [focusInput]);
   const [text, setText] = useState("");
   const [finding, setFinding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +115,7 @@ function AddressForm({ onDone, canCancel }: { onDone: () => void; canCancel: boo
       </label>
       <div className="flex flex-wrap gap-2">
         <input
+          ref={inputRef}
           id="address"
           name="address"
           autoComplete="street-address"
@@ -130,9 +173,14 @@ function Results({ place }: { place: SavedPlace }) {
         ))}
       </div>
 
-      <div aria-live="polite" className="text-[15px] text-muted empty:hidden">
-        {rows === undefined ? "Loading files near you…" : rows.length === 0 ? emptyMessage(filter) : null}
-      </div>
+      {/* Mounted before results arrive so screen readers announce each change (loading, count, empty). */}
+      <p role="status" className="text-[15px] text-muted">
+        {rows === undefined
+          ? "Loading files near you…"
+          : rows.length === 0
+            ? emptyMessage(filter)
+            : `${rows.length} ${rows.length === 1 ? "file" : "files"} within half a mile`}
+      </p>
 
       {rows && rows.length > 0 && (
         <ul className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
@@ -142,8 +190,9 @@ function Results({ place }: { place: SavedPlace }) {
                 href={`/files/${r.fileNumber}`}
                 className="flex h-full flex-col gap-1.5 rounded-xl border border-line bg-white p-3.5 text-ink no-underline hover:border-link hover:text-ink"
               >
-                <span className="font-mono text-[10px] font-semibold tracking-[0.06em] text-muted">
+                <span className="font-mono text-[11px] font-semibold tracking-[0.06em] text-muted">
                   {kindLabel(r.kind)} · FILE {r.fileNumber}
+                  <span className="sr-only">. </span>
                 </span>
                 <span className="text-[17px] font-extrabold leading-tight">{placeHeading(r.title, r.fileNumber)}</span>
                 <span

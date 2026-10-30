@@ -19,6 +19,8 @@
 
 @layer base {
   html {
+    /* Keeps focused items clear of the fixed phone bottom nav. */
+    scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom));
     background: var(--color-paper);
     color: var(--color-ink);
     accent-color: var(--color-link);

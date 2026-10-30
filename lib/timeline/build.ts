@@ -8,7 +8,8 @@ const LABELS = new Map([
 ]);
 
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\w)/g, (_, a, b) => a + b.toUpperCase());
-const label = (name: string) => LABELS.get(name.trim().toUpperCase()) ?? titleCase(name.trim());
+/** Display name for a Legistar body, shared by the timeline and Near me so a body reads the same everywhere. */
+export const label = (name: string) => LABELS.get(name.trim().toUpperCase()) ?? titleCase(name.trim());
 const day = (iso: string) => iso.slice(0, 10);
 
 // Same-date tie-break: CPC < ZND < Council < Mayor; Council rows keep history order (stable sort).

@@ -73,6 +73,7 @@ describe("geocodeUserAddress", () => {
     expect(await sent("711 E Kilbourn Ave, WI")).toBe("711 E Kilbourn Ave, WI");
     expect(await sent("711 E Kilbourn Ave 53202")).toBe("711 E Kilbourn Ave 53202");
     expect(await sent("7700 W Wisconsin Ave")).toBe("7700 W Wisconsin Ave, Milwaukee, WI");
+    expect(await sent("711 E Kilbourn Ave, Wauwatosa")).toBe("711 E Kilbourn Ave, Wauwatosa");
   });
 });
 
@@ -107,6 +108,22 @@ describe("geocodeTyped: city records first, Census as fallback", () => {
     const { hosts, fetchImpl } = route(() => json("down", 503));
     expect(await geocodeTyped("711 E Kilbourn Ave", { fetchImpl })).toMatchObject({ lat: 42.981547950886 });
     expect(hosts).toContain("geocoding.geo.census.gov");
+  });
+  it.each([
+    "100 W Wisconsin Ave, Pewaukee, WI",
+    "100 W Wisconsin Ave 53072",
+    "711 E Kilbourn Ave, Wauwatosa",
+  ])("a typed address in another city or ZIP skips city records: %s", async (text) => {
+    const { hosts, fetchImpl } = route(() => json(kilbourn));
+    await geocodeTyped(text, { fetchImpl });
+    expect(hosts).toEqual(["geocoding.geo.census.gov"]);
+  });
+  it("Milwaukee, WI and 532xx ZIPs still use city records", async () => {
+    for (const text of ["711 E Kilbourn Ave, Milwaukee, WI 53202", "711 E Kilbourn Ave, WI", "711 E Kilbourn Ave 53202"]) {
+      const { hosts, fetchImpl } = route(() => json(kilbourn));
+      expect(await geocodeTyped(text, { fetchImpl })).toMatchObject({ district: 4 });
+      expect(hosts).not.toContain("geocoding.geo.census.gov");
+    }
   });
   it("text the parser cannot read goes straight to Census", async () => {
     const { hosts, fetchImpl } = route(() => json(kilbourn));

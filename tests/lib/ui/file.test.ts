@@ -81,11 +81,23 @@ describe("commentPage", () => {
 
 describe("hearingIcs", () => {
   it("one VEVENT in UTC with file and body, CRLF line endings", () => {
-    const ics = hearingIcs({ fileNumber: "260533", heading: "711 E. Kilbourn Ave.", body: "Common Council", startsAt: "2026-11-04T09:00:00-06:00", eventId: 13430, pageUrl: "https://minutes.example/files/260533" });
+    const ics = hearingIcs(
+      { fileNumber: "260533", heading: "711 E. Kilbourn Ave.", body: "Common Council", startsAt: "2026-11-04T09:00:00-06:00", eventId: 13430, pageUrl: "https://minutes.example/files/260533" },
+      new Date("2026-10-30T12:00:00Z"),
+    );
     expect(ics).toContain("BEGIN:VEVENT\r\n");
     expect(ics).toContain("DTSTART:20261104T150000Z\r\n");
+    expect(ics).toContain("DTSTAMP:20261030T120000Z\r\n");
     expect(ics).toContain("SUMMARY:Common Council: file 260533\\, 711 E. Kilbourn Ave.\r\n");
     expect(ics).toContain("UID:minutes-13430-260533@minutes\r\n");
     expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
+  });
+  it("folds lines longer than 75 characters (RFC 5545)", () => {
+    const ics = hearingIcs(
+      { fileNumber: "260533", heading: "711 E. Kilbourn Ave. and 822 N. Van Buren St.", body: "Zoning, Neighborhoods & Development", startsAt: "2026-11-04T09:00:00-06:00", eventId: 1, pageUrl: "https://minutes.example/files/260533" },
+      new Date("2026-10-30T12:00:00Z"),
+    );
+    for (const line of ics.split("\r\n")) expect(line.length).toBeLessThanOrEqual(75);
+    expect(ics.replace(/\r\n /g, "")).toContain("SUMMARY:Zoning\\, Neighborhoods & Development: file 260533\\, 711 E. Kilbourn Ave. and 822 N. Van Buren St.");
   });
 });
