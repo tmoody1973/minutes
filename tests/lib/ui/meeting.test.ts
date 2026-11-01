@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chapterResult, chapterTitle, clock, meetingSummary, PART_LABELS, testimonySpeakers } from "../../../lib/ui/meeting";
+import { chapterResult, chapterTitle, clock, meetingSummary, PART_LABELS, quoteCitation, testimonySpeakers, voteRows } from "../../../lib/ui/meeting";
 
 describe("clock", () => {
   it("h:mm:ss over an hour, m:ss under", () => {
@@ -78,4 +78,30 @@ describe("testimonySpeakers", () => {
     expect(testimonySpeakers(turns, parts)[0]).toMatchObject({ position: null, positionTurn: null });
   });
   it("no testimony part, no list", () => expect(testimonySpeakers([t("A", 1000, words(50))], [{ kind: "discussion", startMs: 0, endMs: 9000 }])).toEqual([]));
+});
+
+describe("quoteCitation", () => {
+  const base = { quote: "I support this project.", bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T17:30:00-05:00", startMs: 5832000, url: "https://minutes-rust.vercel.app/meetings/13559?item=495640" };
+  it("words, speaker, meeting, video time, link", () =>
+    expect(quoteCitation({ ...base, speaker: "Jane Doe" })).toBe(
+      "“I support this project.” — Jane Doe, City Plan Commission meeting, Sep 28, 2026, at 1:37:12. https://minutes-rust.vercel.app/meetings/13559?item=495640",
+    ));
+  it("an unnamed speaker keeps their label", () => expect(quoteCitation({ ...base, speaker: "Speaker B" })).toContain("” — Speaker B, City Plan"));
+});
+
+describe("voteRows", () => {
+  const chapters = [
+    { item: { title: "A substitute ordinance, at 711 East Kilbourn Avenue.", fileNumber: "250123", actionName: "APPROVED", tally: { aye: 2, no: 0, excused: 0, other: 0 } }, votes: [{ name: "Allyson Nemec", value: "Aye" }, { name: "Tarik Moody", value: "Aye" }] },
+    { item: null, votes: [] },
+    { item: { title: "Communication." }, votes: [{ name: "Willie Smith", value: "Excused" }] },
+  ];
+  const rows = voteRows("2026-09-28T17:30:00-05:00", "CITY PLAN COMMISSION", chapters);
+  it("a header, then one row per member vote", () => {
+    expect(rows[0]).toEqual(["meeting_date", "body", "chapter", "file_number", "item_title", "result", "member", "vote"]);
+    expect(rows.slice(1)).toEqual([
+      ["2026-09-28", "City Plan Commission", "1", "250123", chapters[0].item!.title, "Approved, Vote 2–0", "Allyson Nemec", "Aye"],
+      ["2026-09-28", "City Plan Commission", "1", "250123", chapters[0].item!.title, "Approved, Vote 2–0", "Tarik Moody", "Aye"],
+      ["2026-09-28", "City Plan Commission", "3", "", "Communication.", "", "Willie Smith", "Excused"],
+    ]);
+  });
 });
