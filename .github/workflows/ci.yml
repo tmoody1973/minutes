@@ -21,3 +21,5 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_CONVEX_URL: https://ci-placeholder.convex.cloud
+          # Placeholder in Clerk's key format (encodes clerk.example.com); nothing is served from CI.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k

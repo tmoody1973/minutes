@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { DISCLOSURE, weekOf } from "../../lib/ui/shell";
+import { Account } from "./_components/Account";
 import { AddressChip } from "./_components/AddressChip";
 import { BottomNav, CurrentBottomNav, CurrentTopNav, TopNav } from "./_components/Nav";
 
@@ -34,8 +35,12 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
           <Suspense fallback={<TopNav pathname={null} />}>
             <CurrentTopNav />
           </Suspense>
-          <div className="basis-full md:basis-auto">
+          <div className="flex basis-full items-center justify-between gap-2 md:basis-auto">
             <AddressChip />
+            {/* Clerk reads the session per request: inside Suspense so the shell still prerenders (cacheComponents). */}
+            <Suspense>
+              <Account />
+            </Suspense>
           </div>
         </div>
       </header>

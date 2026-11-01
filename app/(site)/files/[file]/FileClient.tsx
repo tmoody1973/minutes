@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
+import { FollowButton } from "../../_components/FollowButton";
 import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../../lib/ui/file";
 import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
@@ -72,6 +73,9 @@ function FileView({ view }: { view: View }) {
           {heading}
         </h1>
         {purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>}
+        <div>
+          <FollowButton kind="file" value={matter.fileNumber} label={heading} text="Follow this file" />
+        </div>
         {next ? (
           <a
             href="#next-hearing"

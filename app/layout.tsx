@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { IBM_Plex_Mono, Public_Sans } from "next/font/google";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${publicSans.variable} ${plexMono.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <ClerkProvider>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

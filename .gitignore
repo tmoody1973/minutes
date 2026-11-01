@@ -29,3 +29,10 @@ next-env.d.ts
 
 # browser screenshots from local checks
 .playwright-mcp/
+.env*
+!.env.example
+
+# agent skills installed by marketplace integrations (tooling, not product code)
+.agents/
+.claude/skills/
+skills-lock.json
