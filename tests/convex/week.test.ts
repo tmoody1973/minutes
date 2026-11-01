@@ -25,6 +25,8 @@ async function seed() {
   await t.mutation(internal.legistar.upsertEvent, { legistarId: 51, bodyId: 1, bodyName: "COMMON COUNCIL", startsAt: day(20) });
   await t.mutation(internal.legistar.upsertEventItem, { legistarId: 500, eventId: 50, sequence: 1, matterId: 1, title: "t" });
   await t.mutation(internal.legistar.upsertEventItem, { legistarId: 501, eventId: 51, sequence: 1, matterId: 3, title: "t" });
+  // Not zoning, on the same agenda: a grant resolution.
+  await t.mutation(internal.legistar.upsertEventItem, { legistarId: 502, eventId: 50, sequence: 2, matterId: 4, fileNumber: "250004", title: "A resolution relating to a grant." });
   // Decided: matter 2 passed 3 days ago; matter 3 passed 30 days ago; matter 4 (not zoning) passed yesterday.
   await t.mutation(internal.legistar.upsertHistory, { legistarId: 900, matterId: 2, date: day(-3).slice(0, 19), bodyName: "COMMON COUNCIL", actionName: "PASSED", passed: true });
   await t.mutation(internal.legistar.upsertHistory, { legistarId: 901, matterId: 3, date: day(-30).slice(0, 19), bodyName: "COMMON COUNCIL", actionName: "PASSED", passed: true });
@@ -39,5 +41,13 @@ describe("weekAtCityHall", () => {
     expect(w.comingUp.map((c) => c.href)).toEqual(["/files/250001"]);
     expect(w.comingUp[0].message).toMatch(/^100 N\. Test St\. is on the Common Council agenda for /);
     expect(w.decided).toEqual([{ href: "/files/250002", message: expect.stringMatching(/^200 N\. Test St\.: Passed at Common Council, /), at: expect.any(String) }]);
+  });
+  it("also lists the rest of City Hall's week, outside zoning, with counts", async () => {
+    const t = await seed();
+    const { also } = await t.query(api.week.weekAtCityHall, { now: NOW });
+    expect(also.comingUpCount).toBe(1);
+    expect(also.comingUp).toEqual([{ href: "/files/250004", title: "A resolution relating to a grant.", meta: expect.stringMatching(/^Common Council · /) }]);
+    expect(also.decidedCount).toBe(1);
+    expect(also.decided).toEqual([{ href: "/files/250004", title: "A resolution relating to a grant.", meta: expect.stringMatching(/^Common Council · Adopted · /) }]);
   });
 });

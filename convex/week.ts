@@ -2,9 +2,15 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { NEAR_KINDS } from "./locations";
 import { alertMessage } from "../lib/watcher/message";
+import { label } from "../lib/timeline/build";
+import { stepDate } from "../lib/ui/file";
 
 const WEEK_MS = 7 * 86_400_000;
 const MAX_CARDS = 5;
+const ALSO_MAX = 6;
+
+type Also = { href: string; title: string; meta: string };
+const sentenceCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 // Public, read-only: "This week at City Hall" for zoning and development files (the same set Near me covers).
 // Card text comes from record fields only, worded exactly like Watcher alerts. `now` is passed in (rounded by the
@@ -29,10 +35,17 @@ export const weekAtCityHall = query({
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     const comingUp = [];
     const seen = new Set<number>();
+    // Everything else on those agendas, for "Also at City Hall" (Tarik, 2026-11-01): zoning first, then the rest.
+    const alsoUp: Also[] = [];
     for (const ev of upcoming) {
       for (const item of await ctx.db.query("eventItems").withIndex("by_event", (q) => q.eq("eventId", ev.legistarId)).collect()) {
-        const m = item.matterId === undefined ? undefined : zoning.get(item.matterId);
-        if (!m || item.removedAt !== undefined || seen.has(item.matterId!)) continue;
+        if (item.matterId === undefined || item.removedAt !== undefined || seen.has(item.matterId)) continue;
+        const m = zoning.get(item.matterId);
+        if (!m) {
+          seen.add(item.matterId);
+          if (item.fileNumber) alsoUp.push({ href: `/files/${item.fileNumber}`, title: item.title, meta: `${label(ev.bodyName)} · ${stepDate(ev.startsAt.slice(0, 10), ev.startsAt)}` });
+          continue;
+        }
         seen.add(item.matterId!);
         comingUp.push({ ...alertMessage({ kind: "hearing_scheduled", ...m, bodyName: ev.bodyName, startsAt: ev.startsAt }), at: ev.startsAt });
       }
@@ -50,6 +63,24 @@ export const weekAtCityHall = query({
     }
     decided.sort((a, b) => b.at.localeCompare(a.at));
 
-    return { comingUp: comingUp.slice(0, MAX_CARDS), decided: decided.slice(0, MAX_CARDS) };
+    // Decided outside zoning: each file's latest decision in the last 7 days, read through the date index.
+    const since = new Date(now - WEEK_MS).toISOString().slice(0, 19);
+    const until = new Date(now).toISOString().slice(0, 19);
+    const recent = await ctx.db.query("histories").withIndex("by_date", (q) => q.gt("date", since).lte("date", until)).collect();
+    const latestByMatter = new Map<number, (typeof recent)[number]>();
+    for (const h of recent.sort((a, b) => b.date.localeCompare(a.date))) {
+      if (h.passed !== undefined && !zoning.has(h.matterId) && !latestByMatter.has(h.matterId)) latestByMatter.set(h.matterId, h);
+    }
+    const alsoDecided: Also[] = [];
+    for (const h of [...latestByMatter.values()].slice(0, ALSO_MAX)) {
+      const m = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", h.matterId)).unique();
+      if (m) alsoDecided.push({ href: `/files/${m.fileNumber}`, title: m.title, meta: `${label(h.bodyName)} · ${sentenceCase(h.actionName.trim())} · ${stepDate(h.date.slice(0, 10))}` });
+    }
+
+    return {
+      comingUp: comingUp.slice(0, MAX_CARDS),
+      decided: decided.slice(0, MAX_CARDS),
+      also: { comingUp: alsoUp.slice(0, ALSO_MAX), comingUpCount: alsoUp.length, decided: alsoDecided, decidedCount: latestByMatter.size },
+    };
   },
 });

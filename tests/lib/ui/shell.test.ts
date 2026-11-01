@@ -11,6 +11,9 @@ describe("isActive", () => {
     expect(isActive("/meetings/13559", "/meetings")).toBe(true);
     expect(isActive("/meetingsx", "/meetings")).toBe(false);
   });
+  it("no tab is current on the landing page", () => {
+    expect(NAV.filter((n) => isActive("/", n.href))).toHaveLength(0);
+  });
   it("exactly one tab is current on each nav page", () => {
     for (const { href } of NAV) expect(NAV.filter((n) => isActive(href, n.href))).toHaveLength(1);
   });

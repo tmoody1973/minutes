@@ -7,7 +7,7 @@ export type NavIcon = "week" | "pin" | "video" | "bookmark";
 
 // One label set on every width (Tarik, 2026-10-29); order follows the phone mockup.
 export const NAV: readonly { href: string; label: string; icon: NavIcon }[] = [
-  { href: "/", label: "This week", icon: "week" },
+  { href: "/week", label: "This week", icon: "week" },
   { href: "/near", label: "Near me", icon: "pin" },
   { href: "/meetings", label: "Meetings", icon: "video" },
   { href: "/following", label: "Following", icon: "bookmark" },

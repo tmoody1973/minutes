@@ -49,7 +49,12 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
 
       {/* ponytail: voice slot. Ask by voice (M8, should-tier) mounts above the bottom nav here; nothing renders until it ships. */}
       <footer className="mx-auto w-full max-w-[1360px] px-4 pb-6 md:px-7">
-        <p className="max-w-[65ch] text-xs leading-relaxed text-muted">{DISCLOSURE}</p>
+        <p className="max-w-[65ch] text-xs leading-relaxed text-muted">
+          {DISCLOSURE}{" "}
+          <Link href="/about" className="font-semibold">
+            About Minutes
+          </Link>
+        </p>
       </footer>
 
       <Suspense fallback={<BottomNav pathname={null} />}>
