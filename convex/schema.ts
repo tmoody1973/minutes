@@ -82,7 +82,9 @@ export default defineSchema({
     })),
   })
     .index("by_legistarId", ["legistarId"])
-    .index("by_fileNumber", ["fileNumber"]),
+    .index("by_fileNumber", ["fileNumber"])
+    // Search box: titles carry the addresses and the subject ("711 East Kilbourn Avenue", "tax deed").
+    .searchIndex("search_title", { searchField: "title" }),
   // Slim read model for near-me: one row per zoning-kind matter that has at least one parcel centroid.
   // Maintained by upsertMatter / setMatterParcels (convex/locations.ts); no polygons, so reads stay small.
   matterLocations: defineTable({
@@ -181,7 +183,9 @@ export default defineSchema({
     source: v.union(v.literal("transcript"), v.literal("captions")),
   })
     .index("by_event", ["eventId", "startMs"])
-    .index("by_event_turnKey", ["eventId", "turnKey"]),
+    .index("by_event_turnKey", ["eventId", "turnKey"])
+    // Search box: words said in a meeting.
+    .searchIndex("search_text", { searchField: "text" }),
   speakerAssignments: defineTable({
     eventId: v.number(),
     label: v.string(),
