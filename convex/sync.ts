@@ -91,15 +91,16 @@ export const syncEvent = internalAction({
   handler: async (ctx, { eventId }) => {
     await recorded(ctx, "child", `syncEvent ${eventId}`, async (c) => {
       const items = (await legistarGet<Raw[]>(`events/${eventId}/eventitems`, { MinutesNote: "1" })).map(parseEventItem);
+      // All of the meeting's items in one call; then one call per voted item (names, votes and tally together).
+      await c.attempt("items", async () => {
+        await ctx.runMutation(internal.legistar.upsertEventItems, { items });
+      });
       for (const item of items) {
-        await c.attempt(`item ${item.legistarId}`, async () => {
-          await ctx.runMutation(internal.legistar.upsertEventItem, item);
-          if (!hasVotes(item)) return;
+        if (!hasVotes(item)) continue;
+        await c.attempt(`votes ${item.legistarId}`, async () => {
           const votes = (await legistarGet<Raw[]>(`eventitems/${item.legistarId}/votes`)).map((r) => parseVote(r, item.legistarId));
           if (!votes.length) return;
-          for (const vote of votes) await ctx.runMutation(internal.legistar.upsertPerson, { legistarId: vote.personId, name: vote.personName });
-          await ctx.runMutation(internal.legistar.replaceVotes, { eventItemId: item.legistarId, votes });
-          await ctx.runMutation(internal.legistar.setEventItemTally, { eventItemLegistarId: item.legistarId, tally: computeTally(votes) });
+          await ctx.runMutation(internal.legistar.saveVotes, { eventItemId: item.legistarId, votes, tally: computeTally(votes) });
         });
       }
       await ctx.runMutation(internal.legistar.markEventItemsRemoved, {
@@ -155,13 +156,13 @@ export const syncMatter = internalAction({
           await ctx.runMutation(internal.legistar.setMatterParcels, { matterId, parcels });
         });
       }
-      for (const h of await legistarGet<Raw[]>(`matters/${matterId}/histories`)) {
+      await c.attempt("histories", async () => {
         // Some rows carry no body (e.g. matter 74892 id 496081); a step with no body can't be shown, so skip it.
-        if (typeof h.MatterHistoryActionBodyName !== "string") continue;
-        await c.attempt(`history ${String(h.MatterHistoryId)}`, async () => {
-          await ctx.runMutation(internal.legistar.upsertHistory, parseHistory(h, matterId));
-        });
-      }
+        const rows = (await legistarGet<Raw[]>(`matters/${matterId}/histories`))
+          .filter((h) => typeof h.MatterHistoryActionBodyName === "string")
+          .map((h) => parseHistory(h, matterId));
+        await ctx.runMutation(internal.legistar.upsertHistories, { rows });
+      });
       // Only a fully clean pass counts as fresh; a partial one is retried next run.
       if (!c.errors.length) await ctx.runMutation(internal.legistar.markMatterSynced, { matterId, at: Date.now() });
     });

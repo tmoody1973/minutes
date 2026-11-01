@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { boxV, parcelV, tallyV } from "./schema";
 import { syncMatterLocation } from "./locations";
@@ -62,8 +62,7 @@ export const upsertEvent = internalMutation({
   handler: async (ctx, args) => out(await upsert(ctx, "events", args)),
 });
 
-export const upsertEventItem = internalMutation({
-  args: {
+const eventItemArgs = {
     legistarId: v.number(),
     eventId: v.number(),
     sequence: v.union(v.number(), v.null()),
@@ -76,8 +75,9 @@ export const upsertEventItem = internalMutation({
     mover: v.optional(v.string()),
     seconder: v.optional(v.string()),
     minutesNote: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
+  };
+
+async function saveEventItem(ctx: MutationCtx, args: Infer<typeof eventItemV>) {
     const r = await upsert(ctx, "eventItems", args);
     // Legistar records a scheduled hearing as a future agenda item, not a history row.
     if (r.inserted && args.matterId !== undefined) {
@@ -94,6 +94,20 @@ export const upsertEventItem = internalMutation({
       }
     }
     return out(r);
+}
+
+const eventItemV = v.object(eventItemArgs);
+
+export const upsertEventItem = internalMutation({
+  args: eventItemArgs,
+  handler: (ctx, args) => saveEventItem(ctx, args),
+});
+
+// One call per meeting instead of one per agenda item (the sync runs every 30 minutes and nightly since Jan 1).
+export const upsertEventItems = internalMutation({
+  args: { items: v.array(eventItemV) },
+  handler: async (ctx, { items }) => {
+    for (const item of items) await saveEventItem(ctx, item);
   },
 });
 
@@ -200,8 +214,7 @@ export const markMatterSynced = internalMutation({
   },
 });
 
-export const upsertHistory = internalMutation({
-  args: {
+const historyArgs = {
     legistarId: v.number(),
     matterId: v.number(),
     date: v.string(),
@@ -209,8 +222,10 @@ export const upsertHistory = internalMutation({
     actionName: v.string(),
     passed: v.optional(v.boolean()),
     eventId: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
+  };
+const historyV = v.object(historyArgs);
+
+async function saveHistory(ctx: MutationCtx, args: Infer<typeof historyV>) {
     const r = await upsert(ctx, "histories", args);
     if (r.inserted) {
       await recordChange(ctx, {
@@ -222,6 +237,18 @@ export const upsertHistory = internalMutation({
       });
     }
     return out(r);
+}
+
+export const upsertHistory = internalMutation({
+  args: historyArgs,
+  handler: (ctx, args) => saveHistory(ctx, args),
+});
+
+// One call per matter instead of one per history row.
+export const upsertHistories = internalMutation({
+  args: { rows: v.array(historyV) },
+  handler: async (ctx, { rows }) => {
+    for (const row of rows) await saveHistory(ctx, row);
   },
 });
 
@@ -254,6 +281,26 @@ export const setEventItemTally = internalMutation({
 });
 
 const voteV = v.object({ eventItemId: v.number(), personId: v.number(), personName: v.string(), value: v.string() });
+
+// One call per voted agenda item: voters' names, the votes and the tally together (was one call per voter plus
+// two). Names and tally are written only when they changed, so an unchanged item writes nothing.
+export const saveVotes = internalMutation({
+  args: { eventItemId: v.number(), votes: v.array(voteV), tally: tallyV },
+  handler: async (ctx, { eventItemId, votes, tally }) => {
+    const people = new Map(votes.map((x) => [x.personId, x.personName]));
+    for (const [legistarId, name] of people) await upsert(ctx, "persons", { legistarId, name });
+    const old = await ctx.db.query("votes").withIndex("by_eventItem", (q) => q.eq("eventItemId", eventItemId)).collect();
+    const key = (x: { personId: number; personName: string; value: string }) => `${x.personId}|${x.personName}|${x.value}`;
+    if (!(old.length === votes.length && old.map(key).sort().join() === votes.map(key).sort().join())) {
+      for (const o of old) await ctx.db.delete(o._id);
+      for (const vote of votes) await ctx.db.insert("votes", vote);
+    }
+    const row = await ctx.db.query("eventItems").withIndex("by_legistarId", (q) => q.eq("legistarId", eventItemId)).unique();
+    if (!row) throw new Error(`event item ${eventItemId} not found`);
+    const t = row.tally;
+    if (!t || t.aye !== tally.aye || t.no !== tally.no || t.excused !== tally.excused || t.other !== tally.other) await ctx.db.patch(row._id, { tally });
+  },
+});
 
 export const replaceVotes = internalMutation({
   args: { eventItemId: v.number(), votes: v.array(voteV) },
