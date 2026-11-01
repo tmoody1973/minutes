@@ -223,4 +223,26 @@ export default defineSchema({
     // "top" = entry-point run (ok means scheduled); "child" = fan-out job, written only on failure.
     scope: v.union(v.literal("top"), v.literal("child")),
   }).index("by_finishedAt", ["finishedAt"]),
+  // ---- Milestone 7: Clerk cards and the Editor ----
+  // Only Editor-approved sentences are stored. key = file number, or "eventId:eventItemId" for a chapter.
+  cards: defineTable({
+    kind: v.union(v.literal("file"), v.literal("chapter")),
+    key: v.string(),
+    // Hash of the records the card was written from; the writer skips a card whose records have not changed.
+    sourcesHash: v.string(),
+    sentences: v.array(v.object({ text: v.string(), sourceKeys: v.array(v.string()) })),
+    sourceLabels: v.record(v.string(), v.string()),
+    writtenAt: v.number(),
+  }).index("by_kind_key", ["kind", "key"]),
+  // Every verdict, pass or fail, for the rejection-rate metric.
+  editorLog: defineTable({
+    cardKind: v.union(v.literal("file"), v.literal("chapter")),
+    cardKey: v.string(),
+    text: v.string(),
+    sourceKeys: v.array(v.string()),
+    ok: v.boolean(),
+    reason: v.optional(v.string()),
+    detail: v.optional(v.string()),
+    at: v.number(),
+  }).index("by_card", ["cardKind", "cardKey"]),
 });

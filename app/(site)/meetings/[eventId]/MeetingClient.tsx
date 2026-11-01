@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
+import { PlainCard } from "../../_components/PlainCard";
 import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers } from "../../../../lib/ui/meeting";
 import { bodyLabel } from "../../../../lib/ui/near";
 import { Parts, SourceNote, Transcript } from "../_components/MeetingBits";
@@ -43,6 +44,7 @@ export function MeetingClient() {
 }
 
 function MeetingView({ view, event, initialItem }: { view: View; event: NonNullable<View["event"]>; initialItem: number | null }) {
+  const { eventId } = useParams<{ eventId: string }>();
   const chapters = view.chapters;
   const initial = chapters.findIndex((c) => c.eventItemId === initialItem);
   // Phone: the open chapter (-1 = none). Laptop: the shown chapter (first one when none is open).
@@ -134,6 +136,7 @@ function MeetingView({ view, event, initialItem }: { view: View; event: NonNulla
             </h2>
             {open === i && (
               <div className="flex flex-col gap-4 px-3.5 pb-4">
+                <PlainCard kind="chapter" cardKey={`${eventId}:${c.eventItemId}`} />
                 <Parts chapter={c} watch={watch} />
                 <Testimony chapter={c} turns={view.turns} watch={watch} />
                 {c.votes.length > 0 && <VoteTable votes={c.votes} />}
@@ -160,6 +163,7 @@ function MeetingView({ view, event, initialItem }: { view: View; event: NonNulla
           <h2 id="chapter-heading" ref={headingRef} tabIndex={-1} className="scroll-mt-4 text-xl font-extrabold">
             {titleOf(shown)}
           </h2>
+          <PlainCard kind="chapter" cardKey={`${eventId}:${shown.eventItemId}`} />
           <Parts chapter={shown} watch={watch} />
           <Transcript chapter={shown} turns={view.turns} source={view.transcriptSource} watch={watch} />
         </section>
