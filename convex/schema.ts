@@ -107,7 +107,9 @@ export default defineSchema({
     eventId: v.optional(v.number()),
   })
     .index("by_legistarId", ["legistarId"])
-    .index("by_matter", ["matterId"]),
+    .index("by_matter", ["matterId"])
+    // This week's "decided" list reads only the last 7 days of rows.
+    .index("by_date", ["date"]),
   votes: defineTable({
     eventItemId: v.number(),
     personId: v.number(),
