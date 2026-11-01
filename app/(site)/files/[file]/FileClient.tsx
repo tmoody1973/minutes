@@ -8,6 +8,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { FollowButton } from "../../_components/FollowButton";
+import { PlainCard } from "../../_components/PlainCard";
 import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../../lib/ui/file";
 import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
@@ -72,7 +73,7 @@ function FileView({ view }: { view: View }) {
         <h1 id="file-heading" className="text-[28px] font-extrabold leading-[1.15] md:text-[32px]">
           {heading}
         </h1>
-        {purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>}
+        <PlainCard kind="file" cardKey={matter.fileNumber} fallback={purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>} />
         <div>
           <FollowButton kind="file" value={matter.fileNumber} label={heading} text="Follow this file" />
         </div>
