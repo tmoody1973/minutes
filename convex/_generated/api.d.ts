@@ -10,11 +10,14 @@
 
 import type * as crons from "../crons.js";
 import type * as files from "../files.js";
+import type * as follows from "../follows.js";
 import type * as legistar from "../legistar.js";
 import type * as locations from "../locations.js";
 import type * as media from "../media.js";
 import type * as near from "../near.js";
 import type * as sync from "../sync.js";
+import type * as watcher from "../watcher.js";
+import type * as week from "../week.js";
 
 import type {
   ApiFromModules,
@@ -25,11 +28,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   files: typeof files;
+  follows: typeof follows;
   legistar: typeof legistar;
   locations: typeof locations;
   media: typeof media;
   near: typeof near;
   sync: typeof sync;
+  watcher: typeof watcher;
+  week: typeof week;
 }>;
 
 /**

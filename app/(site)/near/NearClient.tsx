@@ -15,6 +15,7 @@ import {
   type SavedPlace,
   shortAddress,
 } from "../../../lib/ui/near";
+import { FollowButton } from "../_components/FollowButton";
 import { savePlace, useSavedPlace } from "../_components/savedPlace";
 
 const GEOCODE_ERRORS = {
@@ -75,6 +76,10 @@ export function NearClient() {
           Forget this address
         </button>
       </p>
+      <div className="flex flex-wrap gap-2">
+        <FollowButton kind="address" value={`${place.lat},${place.lng}`} label="Area" text="Follow this area" />
+        {place.district && <FollowButton kind="alder" value={String(place.district)} label={`District ${place.district}`} text={`Follow District ${place.district}`} />}
+      </div>
       <Results place={place} />
     </>
   );

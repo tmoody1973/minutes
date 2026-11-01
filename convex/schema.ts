@@ -128,6 +128,45 @@ export default defineSchema({
   })
     .index("by_sourceKey", ["sourceKey"])
     .index("by_matter", ["matterId"]),
+  // ---- Milestone 6: accounts, follows and the Watcher (userId = Clerk tokenIdentifier) ----
+  users: defineTable({
+    userId: v.string(),
+    email: v.optional(v.string()),
+    // Set by the unsubscribe link in every alert email; on-site alerts continue.
+    emailOff: v.optional(v.boolean()),
+    unsubscribeToken: v.string(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_unsubscribeToken", ["unsubscribeToken"]),
+  // value: file number; "lat,lng" rounded to ~100 m for an address (never the typed text); district number; topic words.
+  follows: defineTable({
+    userId: v.string(),
+    kind: v.union(v.literal("file"), v.literal("address"), v.literal("alder"), v.literal("topic")),
+    value: v.string(),
+    label: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_user_kind_value", ["userId", "kind", "value"]),
+  // At most one alert per real change per user (lookup on userId + sourceKey before insert).
+  alerts: defineTable({
+    userId: v.string(),
+    sourceKey: v.string(),
+    matterId: v.number(),
+    changeKind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("step_added")),
+    message: v.string(),
+    href: v.string(),
+    createdAt: v.number(),
+    replay: v.boolean(),
+    // When this replays a real past change: that change's date (shown as "Replay of a real alert from {date}").
+    replayOf: v.optional(v.string()),
+    emailedAt: v.optional(v.number()),
+  })
+    .index("by_user_source", ["userId", "sourceKey"])
+    .index("by_userId", ["userId"]),
+  activityLog: defineTable({ userId: v.string(), at: v.number(), text: v.string() }).index("by_userId", ["userId"]),
+  // Single row: the _creationTime of the last change the Watcher has read.
+  watcherState: defineTable({ key: v.literal("cursor"), changesThrough: v.number() }).index("by_key", ["key"]),
   // ---- Milestone 3: derived meeting data (ids are Legistar ids) ----
   turns: defineTable({
     eventId: v.number(),
