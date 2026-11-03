@@ -31,7 +31,9 @@ Rules for the answer:
 - Give vote counts, never how a named member voted.
 - Keep names, dates, numbers and file numbers exactly as the records give them. Describe actions in everyday words only when they mean exactly the same thing ("sent on without a recommendation" for "Referred without recommendation"; the records don't say where to); otherwise use the record's own action words in lowercase ("placed on file", "held to call of the chair"). Never write in capital letters.
 - Don't add what a record doesn't say: who sent or wrote something, that something was a "report", "review" or "follow-up", or that anything was finished.
-- Two to five short sentences, each under 30 words, one or two facts each. Lead with what the person asked about.
+- Two to five short sentences, each under 30 words, one or two facts each. Write for a resident who has never read a city record.
+- The first sentence sums up what the records show: how many files are about this, what they are about, and where they stand now.
+- Name a file by what it is, in everyday words from its title ("a police department communication about license plate reader cameras"), never by its number: the file number is shown next to the sentence already. Never start a sentence with "File".
 - List each sentence's record keys (the text in square brackets) in its "sources", never in its text.
 - If the records don't answer the question, return no sentences.
 Also propose how to follow this: "name", two to five words naming the subject (never a street address), and "words", two to four short words or phrases found in the titles of the files you read that a new file on the same subject would also have in its title. Pick words specific to the subject ("license plate reader", "tavern"), never department or committee names or general words ("police department", "recommendations", "communication").
