@@ -1,3 +1,4 @@
+import { agreedTally } from "@/lib/legistar/tally";
 import type { EventItemRecord, EventRecord, HistoryRecord, MatterRecord, Tally, TimelineStep } from "@/lib/types";
 
 const LABELS = new Map([
@@ -22,15 +23,12 @@ const rank = (body: string) => RANK.get(body) ?? 2;
 // Prefer the agenda row (non-null sequence) over minutes-only duplicates.
 const pick = (rows: EventItemRecord[]) => rows.find((i) => i.sequence !== null) ?? rows[0];
 
-const sameTally = (a: Tally, b: Tally) => a.aye === b.aye && a.no === b.no && a.excused === b.excused && a.other === b.other;
-
 // A step can stand for many votes on one file at one meeting (each budget amendment is its own agenda entry), and
 // history rows don't say which entry they came from. A vote is shown only when every one of them had the same count.
 function link(rows: EventItemRecord[], tallies: Map<number, Tally>): Partial<TimelineStep> {
   if (!rows.length) return {};
   const it = pick(rows);
-  const ts = rows.flatMap((r) => tallies.get(r.legistarId) ?? []);
-  const tally = ts.length && ts.every((t) => sameTally(t, ts[0])) ? ts[0] : undefined;
+  const tally = agreedTally(rows.flatMap((r) => tallies.get(r.legistarId) ?? []));
   return {
     eventItemId: it.legistarId,
     ...(it.videoStartSec !== undefined && { videoStartSec: it.videoStartSec }),

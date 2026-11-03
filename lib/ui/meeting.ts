@@ -1,7 +1,8 @@
 // Display helpers for the meeting page (mockups MinPhoneMeeting, MinLaptopMeeting). Pure: safe in client and server code.
 import { type StatedPosition, statedPosition } from "../media/positions";
+import { agreedTally } from "../legistar/tally";
 import type { Tally } from "../types";
-import { actionText, stepDate, tallyText } from "./file";
+import { actionText, stepDate, subjectOf, tallyText } from "./file";
 import { bodyLabel, placeHeading } from "./near";
 
 // 2051000 -> "34:11"; 5832000 -> "1:37:12".
@@ -16,11 +17,58 @@ export function clock(ms: number): string {
 export function chapterTitle(title: string, fileNumber?: string): string {
   const place = fileNumber ? placeHeading(title, fileNumber) : "";
   if (place && !place.startsWith("File ")) return place;
+  // "Communication from the Mayor relating to the proposed 2027 budget" -> "The proposed 2027 budget", as on the file page.
+  const named = subjectOf(title);
+  if (named) return named.charAt(0).toUpperCase() + named.slice(1);
   const subject = title
     .replace(/^an?\s+(?:substitute\s+)?(?:ordinance|resolution)\s+relating\s+to\s+(?:the\s+)?/i, "")
     .replace(/\.\s*$/, "")
     .trim();
   return subject.charAt(0).toUpperCase() + subject.slice(1);
+}
+
+const KIND = /^(?:an?\s+)?((?:substitute\s+)?(?:charter\s+)?(?:ordinance|resolution|motion|communication))\b/i;
+/** "A charter ordinance relating to…" -> "Charter ordinance": tells apart files whose subjects read the same. */
+export function titleKind(title: string): string | null {
+  const m = KIND.exec(title.trim());
+  return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase().replace(/\s+/g, " ") : null;
+}
+
+export interface AgendaItem { legistarId: number; sequence: number | null; title: string; fileNumber?: string; actionName?: string; tally?: Tally; videoStartSec?: number; removedAt?: number; mover?: string; seconder?: string; minutesNote?: string }
+export interface AgendaRow { eventItemId: number; title: string; fileNumber: string; actions: string[]; tally?: Tally; startSec?: number; mover?: string; seconder?: string; note?: string }
+
+// Legistar writes members in capitals ("ALD. MOORE").
+const nameCase = (s: string) => s.trim().toLowerCase().replace(/(^|[\s.-])(\w)/g, (_, a, c) => a + c.toUpperCase());
+
+// A meeting without chapters, read from the records alone: each agenda item with a file, in agenda order. The minutes
+// add a row per further motion on the same file (each budget amendment is one), so those fold into their item; every
+// row is one recorded action, the same count the file page shows. Notices with no file ("will be webcast") are left out.
+export function agendaRows(items: AgendaItem[]): AgendaRow[] {
+  const live = items.filter((i) => !i.removedAt && i.fileNumber);
+  const agenda = live.filter((i) => i.sequence !== null).sort((a, b) => a.sequence! - b.sequence!);
+  const seen = new Set<string>();
+  return agenda.flatMap((a) => {
+    if (seen.has(a.fileNumber!)) return [];
+    seen.add(a.fileNumber!);
+    const minutes = live.filter((i) => i.sequence === null && i.fileNumber === a.fileNumber).sort((x, y) => x.legistarId - y.legistarId);
+    const all = [a, ...minutes];
+    const tally = agreedTally(all.flatMap((i) => (i.tally ? [i.tally] : [])));
+    const starts = all.flatMap((i) => (i.videoStartSec === undefined ? [] : [i.videoStartSec]));
+    const acted = all.filter((i) => i.actionName);
+    // "Moved by" only when the item had one motion; with several (amendments), each had its own mover.
+    const only = acted.length === 1 ? acted[0] : undefined;
+    return [{
+      eventItemId: a.legistarId,
+      title: a.title,
+      fileNumber: a.fileNumber!,
+      actions: all.flatMap((i) => (i.actionName ? [i.actionName] : [])),
+      ...(tally && { tally }),
+      ...(starts.length && { startSec: Math.min(...starts) }),
+      ...(only?.mover && { mover: nameCase(only.mover) }),
+      ...(only?.seconder && { seconder: nameCase(only.seconder) }),
+      ...(a.minutesNote && { note: a.minutesNote }),
+    }];
+  });
 }
 
 export function chapterResult(item: { actionName?: string; tally?: Tally }): string | null {
@@ -65,11 +113,12 @@ export const PART_LABELS: Record<string, string> = {
 export function meetingSummary(v: {
   turns: { endMs: number }[];
   chapters: { endMs: number | null; item: { actionName?: string } | null }[];
+  agenda?: { actions: string[] }[];
 }): string {
   const end = Math.max(0, ...v.turns.map((t) => t.endMs), ...v.chapters.map((c) => c.endMs ?? 0));
   const mins = Math.round(end / 60000);
   const length = mins >= 60 ? `${Math.floor(mins / 60)} hr ${mins % 60} min` : `${mins} min`;
-  const decisions = v.chapters.filter((c) => c.item?.actionName).length;
+  const decisions = v.chapters.length ? v.chapters.filter((c) => c.item?.actionName).length : (v.agenda ?? []).filter((a) => a.actions.length).length;
   return [end > 0 && `${length} of video`, `${decisions} ${decisions === 1 ? "decision" : "decisions"}`].filter(Boolean).join(" · ");
 }
 

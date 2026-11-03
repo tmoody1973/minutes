@@ -9,7 +9,8 @@ import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { PlainCard } from "../../_components/PlainCard";
 import { downloadCsv } from "../../../../lib/ui/csv";
-import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers, voteRows } from "../../../../lib/ui/meeting";
+import { actionText, tallyText } from "../../../../lib/ui/file";
+import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers, titleKind, voteRows } from "../../../../lib/ui/meeting";
 import { bodyLabel } from "../../../../lib/ui/near";
 import { Parts, SourceNote, Transcript } from "../_components/MeetingBits";
 import { Quote } from "../_components/Quote";
@@ -42,7 +43,7 @@ export function MeetingClient() {
       </div>
     );
   }
-  return <MeetingView view={view} event={view.event} initialItem={item} />;
+  return view.chapters.length ? <MeetingView view={view} event={view.event} initialItem={item} /> : <AgendaView view={view} event={view.event} />;
 }
 
 function MeetingView({ view, event, initialItem }: { view: View; event: Event; initialItem: number | null }) {
@@ -67,7 +68,9 @@ function MeetingView({ view, event, initialItem }: { view: View; event: Event; i
     .toUpperCase();
 
   return (
-    <div className="flex flex-col gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:items-start md:gap-5 md:[grid-template-areas:'head_head''nav_player''nav_detail''nav_aside'] xl:grid-cols-[15rem_minmax(0,1fr)_20rem] xl:[grid-template-areas:'head_head_head''nav_player_aside''nav_detail_aside']">
+    // Laptop: the video sits top right and stays in view, with the decision under it; chapters and the transcript run
+    // down the left. Phone: video first, then the chapters.
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:items-start md:gap-5 md:[grid-template-areas:'head_head''nav_side''nav_detail'] xl:grid-cols-[15rem_minmax(0,1fr)_26rem] xl:[grid-template-areas:'head_head_head''nav_detail_side']">
       <header className="flex flex-col gap-1 md:[grid-area:head]">
         <span className={mono}>
           {bodyLabel(event.bodyName).toUpperCase()} · {date}
@@ -84,7 +87,6 @@ function MeetingView({ view, event, initialItem }: { view: View; event: Event; i
             Download votes (CSV)
           </button>
         )}
-        {!chapters.length && <p className="text-[15px] text-muted">This meeting hasn&apos;t been split into chapters yet.</p>}
       </header>
 
       <nav aria-label="Chapters" className="hidden md:flex md:flex-col md:gap-1.5 md:[grid-area:nav]">
@@ -109,26 +111,45 @@ function MeetingView({ view, event, initialItem }: { view: View; event: Event; i
         ))}
       </nav>
 
-      <div ref={playerRef} className="flex scroll-mt-4 flex-col gap-1.5 md:[grid-area:player]">
-        {event.clipId !== null ? (
-          <>
-            <iframe
-              key={`${atMs}-${seeks}`}
-              src={granicusLink(event.clipId, atMs)}
-              title={`Meeting video from ${clock(atMs)}, City of Milwaukee player`}
-              allow="autoplay; fullscreen"
-              className="aspect-video w-full rounded-[14px] bg-ink"
-            />
-            <p className="text-[13px] text-muted">
-              Video from the City of Milwaukee.{" "}
-              <a href={granicusLink(event.clipId, atMs)} className="inline-flex min-h-11 items-center font-semibold">
-                Open in the city&apos;s player
-              </a>
-            </p>
-          </>
-        ) : (
-          <p className="text-[15px] text-muted">The city has not posted video for this meeting.</p>
-        )}
+      <div className="flex flex-col gap-3.5 md:[grid-area:side] xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+      <div ref={playerRef} className="flex scroll-mt-4 flex-col gap-1.5">
+        <Player event={event} atMs={atMs} seeks={seeks} />
+      </div>
+
+
+      {shown && (
+        <aside aria-label="Decision and sources" className="hidden flex-col gap-3.5 md:flex">
+          {shown.item?.actionName && (
+            <section aria-labelledby="decision-heading" className={`${card} flex flex-col gap-2.5 p-[18px]`}>
+              <h2 id="decision-heading" className={mono}>
+                DECISION
+              </h2>
+              <p className="text-xl font-extrabold leading-tight">{chapterResult(shown.item)}</p>
+              {shown.votes.length > 0 && <VoteTable votes={shown.votes} />}
+            </section>
+          )}
+          {shown.parts.some((p) => p.kind === "testimony") && (
+            <section className={`${card} p-[18px]`} aria-label="Public testimony">
+              <Testimony chapter={shown} turns={view.turns} watch={watch} event={event} eventId={eventId} />
+            </section>
+          )}
+          <section aria-labelledby="sources-heading" className="flex flex-col gap-2">
+            <h2 id="sources-heading" className={mono}>
+              SOURCES
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {event.agendaUrl && <SourceChip href={event.agendaUrl}>Agenda</SourceChip>}
+              {event.minutesUrl && <SourceChip href={event.minutesUrl}>Minutes</SourceChip>}
+              {shown.docs.map((d) => (
+                <SourceChip key={d.label} href={d.hyperlink}>
+                  {d.label}
+                </SourceChip>
+              ))}
+              {shown.item?.fileNumber && <SourceChip href={`/files/${shown.item.fileNumber}`}>File {shown.item.fileNumber}</SourceChip>}
+            </div>
+          </section>
+        </aside>
+      )}
       </div>
 
       <ol aria-label="Chapters" className="flex flex-col gap-2 md:hidden">
@@ -179,40 +200,99 @@ function MeetingView({ view, event, initialItem }: { view: View; event: Event; i
           <Transcript chapter={shown} turns={view.turns} source={view.transcriptSource} watch={watch} />
         </section>
       )}
+    </div>
+  );
+}
 
-      {shown && (
-        <aside aria-label="Decision and sources" className="hidden flex-col gap-3.5 md:flex md:[grid-area:aside]">
-          {shown.item?.actionName && (
-            <section aria-labelledby="decision-heading" className={`${card} flex flex-col gap-2.5 p-[18px]`}>
-              <h2 id="decision-heading" className={mono}>
-                DECISION
-              </h2>
-              <p className="text-xl font-extrabold leading-tight">{chapterResult(shown.item)}</p>
-              {shown.votes.length > 0 && <VoteTable votes={shown.votes} />}
-            </section>
-          )}
-          {shown.parts.some((p) => p.kind === "testimony") && (
-            <section className={`${card} p-[18px]`} aria-label="Public testimony">
-              <Testimony chapter={shown} turns={view.turns} watch={watch} event={event} eventId={eventId} />
-            </section>
-          )}
-          <section aria-labelledby="sources-heading" className="flex flex-col gap-2">
-            <h2 id="sources-heading" className={mono}>
-              SOURCES
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {event.agendaUrl && <SourceChip href={event.agendaUrl}>Agenda</SourceChip>}
-              {event.minutesUrl && <SourceChip href={event.minutesUrl}>Minutes</SourceChip>}
-              {shown.docs.map((d) => (
-                <SourceChip key={d.label} href={d.hyperlink}>
-                  {d.label}
-                </SourceChip>
-              ))}
-              {shown.item?.fileNumber && <SourceChip href={`/files/${shown.item.fileNumber}`}>File {shown.item.fileNumber}</SourceChip>}
-            </div>
-          </section>
-        </aside>
-      )}
+// The city's own player, started at a moment. A new key reloads it there, even for the same moment chosen twice.
+function Player({ event, atMs, seeks }: { event: Event; atMs: number; seeks: number }) {
+  if (event.clipId === null) return <p className="text-[15px] text-muted">The city has not posted video for this meeting.</p>;
+  return (
+    <>
+      <iframe
+        key={`${atMs}-${seeks}`}
+        src={granicusLink(event.clipId, atMs)}
+        title={`Meeting video from ${clock(atMs)}, City of Milwaukee player`}
+        allow="autoplay; fullscreen"
+        className="aspect-video w-full rounded-[14px] bg-ink"
+      />
+      <p className="text-[13px] text-muted">
+        Video from the City of Milwaukee.{" "}
+        <a href={granicusLink(event.clipId, atMs)} className="inline-flex min-h-11 items-center font-semibold">
+          Open in the city&apos;s player
+        </a>
+      </p>
+    </>
+  );
+}
+
+// A meeting Minutes hasn't split into chapters: the agenda and what was decided, from the city's records alone.
+function AgendaView({ view, event }: { view: View; event: Event }) {
+  const [at, setAt] = useState({ ms: 0, seeks: 0 });
+  const [upcoming] = useState(() => Date.parse(event.startsAt) > Date.now());
+  const playerRef = useRef<HTMLDivElement>(null);
+  const watch = (ms: number) => {
+    setAt((a) => ({ ms, seeks: a.seeks + 1 }));
+    playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const date = new Date(event.startsAt)
+    .toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric", year: "numeric" })
+    .toUpperCase();
+  return (
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_minmax(18rem,26rem)] md:items-start md:gap-x-6 md:gap-y-4">
+      <header className="flex flex-col gap-1 md:col-span-2">
+        <span className={mono}>
+          {bodyLabel(event.bodyName).toUpperCase()} · {date}
+        </span>
+        <h1 className="text-[26px] font-extrabold leading-[1.15] md:text-[32px] md:tracking-[-0.01em]">{upcoming ? "On the agenda" : "What was decided"}</h1>
+        {!upcoming && <p className="max-w-[65ch] text-[15px] text-muted md:text-base">{meetingSummary(view)}</p>}
+        <p className="max-w-[65ch] text-[14px] text-muted">
+          Minutes hasn&apos;t transcribed this meeting. The agenda, actions and vote counts below come from the city&apos;s records.
+        </p>
+      </header>
+      <div ref={playerRef} className="flex scroll-mt-4 flex-col gap-3 md:sticky md:top-4 md:col-start-2 md:row-start-2">
+        {upcoming ? <p className="text-[15px] text-muted">Video is posted by the city after the meeting.</p> : <Player event={event} atMs={at.ms} seeks={at.seeks} />}
+        <div className="flex flex-wrap gap-2">
+          {event.agendaUrl && <SourceChip href={event.agendaUrl}>Agenda</SourceChip>}
+          {event.minutesUrl && <SourceChip href={event.minutesUrl}>Minutes</SourceChip>}
+        </div>
+      </div>
+      <section aria-labelledby="agenda-heading" className="flex flex-col gap-2 md:col-start-1 md:row-start-2">
+        <h2 id="agenda-heading" className={mono}>
+          AGENDA · {view.agenda.length} {view.agenda.length === 1 ? "FILE" : "FILES"}
+        </h2>
+        {view.agenda.length ? (
+          <ol className="flex flex-col gap-2">
+            {view.agenda.map((r) => (
+              <li key={r.eventItemId} className={`${card} flex flex-col gap-1 p-3.5`}>
+                <span className="text-[15px] font-bold leading-snug">{chapterTitle(r.title, r.fileNumber)}</span>
+                <span className="text-[13px] text-muted">
+                  {r.actions.length ? `${actionText(r.actions)}${r.tally ? `, ${tallyText(r.tally)}` : ""}` : upcoming ? "On the agenda" : "No action recorded"}
+                  {r.mover && ` · Moved by ${r.mover}${r.seconder ? `, seconded by ${r.seconder}` : ""}`}
+                </span>
+                {r.note && (
+                  <details className="text-[14px]">
+                    <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-link">What the minutes say</summary>
+                    <p className="max-w-[65ch] whitespace-pre-line leading-normal">{r.note}</p>
+                  </details>
+                )}
+                <span className="flex flex-wrap items-center gap-x-4">
+                  <Link href={`/files/${r.fileNumber}`} className="flex min-h-11 items-center text-sm font-semibold">
+                    {titleKind(r.title) ? `${titleKind(r.title)} · File ${r.fileNumber}` : `File ${r.fileNumber}`}
+                  </Link>
+                  {!upcoming && r.startSec !== undefined && event.clipId !== null && (
+                    <button type="button" onClick={() => watch(r.startSec! * 1000)} className={timeButton}>
+                      Watch from {clock(r.startSec * 1000)}
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-[15px] text-muted">No agenda items with a file are recorded for this meeting yet.</p>
+        )}
+      </section>
     </div>
   );
 }

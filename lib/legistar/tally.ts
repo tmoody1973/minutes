@@ -19,3 +19,10 @@ export function computeTally(votes: VoteRecord[]): Tally {
   }
   return tally;
 }
+
+/** The count every vote shares, or none when they differ: a step or agenda item can stand for many votes (each budget
+ * amendment is its own agenda entry), and showing one of them as "the" vote would be wrong. */
+export function agreedTally(ts: Tally[]): Tally | undefined {
+  const [first] = ts;
+  return first && ts.every((t) => t.aye === first.aye && t.no === first.no && t.excused === first.excused && t.other === first.other) ? first : undefined;
+}

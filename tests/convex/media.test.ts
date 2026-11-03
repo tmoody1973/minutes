@@ -6,7 +6,7 @@ import schema from "../../convex/schema";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 const turn = (k: string, startMs: number, label: string | undefined, text = "hi") => ({ turnKey: k, chunk: 0, startMs, endMs: startMs + 10, label, text, source: "transcript" as const });
-const keys = (t: ReturnType<typeof convexTest>, eventId: number) => t.query(internal.media.turnKeysForEvent, { eventId }).then((k) => k.sort());
+const keys = (t: ReturnType<typeof convexTest>, eventId: number) => t.query(internal.media.turnKeysForEvent, { eventId, cursor: null }).then((r) => r.keys.sort());
 
 describe("turn writes", () => {
   it("re-write is idempotent and removes only this event's stale keys", async () => {
@@ -161,7 +161,7 @@ describe("meetingView page fields", () => {
 });
 
 describe("meetingList", () => {
-  it("lists meetings that have chapters, newest first, with body, date, chapter count and transcript source", async () => {
+  it("lists every meeting, newest first, with body, date, chapter count and transcript source", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.legistar.upsertEvent, { legistarId: 1, bodyId: 272, bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", clipId: 5310 });
     await t.mutation(internal.legistar.upsertEvent, { legistarId: 2, bodyId: 1, bodyName: "COMMON COUNCIL", startsAt: "2026-10-13T09:00:00-05:00" });
@@ -171,6 +171,7 @@ describe("meetingList", () => {
     await t.mutation(internal.media.upsertTurns, { eventId: 2, turns: [{ ...turn("cap:0", 0, undefined), source: "captions" as const }] });
     expect(await t.query(api.media.meetingList, {})).toEqual([
       { eventId: 2, bodyName: "COMMON COUNCIL", startsAt: "2026-10-13T09:00:00-05:00", chapters: 1, transcriptSource: "captions" },
+      { eventId: 3, bodyName: "ZND", startsAt: "2026-10-06T09:00:00-05:00", chapters: 0, transcriptSource: "none" },
       { eventId: 1, bodyName: "CITY PLAN COMMISSION", startsAt: "2026-09-28T13:30:00-05:00", chapters: 2, transcriptSource: "none" },
     ]);
   });
