@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Answer } from "../../../lib/ask/agent";
+import { termsIn } from "../../../lib/legistar/terms";
 import { FollowConcern } from "./FollowConcern";
 
 // Questions answered from the records during testing (Nov 2, 2026); never invented.
@@ -346,6 +347,8 @@ function AnswerView({ answer }: { answer: Answer }) {
         </div>
       )}
 
+      <Terms texts={sentences.map((s) => s.text)} />
+
       {records.length > 0 && (
         <section
           aria-labelledby="records-heading"
@@ -376,6 +379,28 @@ function AnswerView({ answer }: { answer: Answer }) {
 
       <FollowConcern proposed={follow} />
     </div>
+  );
+}
+
+// What the city's action words in this answer mean (lib/legistar/terms); only lines the builder approved.
+function Terms({ texts }: { texts: string[] }) {
+  const terms = termsIn(texts);
+  if (!terms.length) return null;
+  return (
+    <section aria-labelledby="terms-heading" className="flex flex-col gap-2 rounded-xl bg-tint p-4">
+      <h2 id="terms-heading" className="text-[15px] font-extrabold">
+        What these terms mean
+      </h2>
+      <dl className="flex flex-col gap-2">
+        {terms.map((t) => (
+          <div key={t.term}>
+            <dt className="text-[15px] font-bold">{t.term}</dt>
+            <dd className="max-w-[65ch] text-[15px] leading-normal">{t.plain}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-[13px] text-muted">Minutes&rsquo; description of the city&rsquo;s procedure, not a city definition.</p>
+    </section>
   );
 }
 
