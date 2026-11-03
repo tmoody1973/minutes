@@ -68,6 +68,18 @@ describe("Watcher", () => {
     expect(inbox[0]).toMatchObject({ message: "711 E. Kilbourn Ave. and 822 N. Van Buren St.: Passed at Common Council, Nov 4, 2026.", href: "/files/260533", replay: false });
     expect(await alertsOf(t, bo)).toEqual([]);
   });
+  it("a concern (Follow this) alerts when any of its words is in the decided file's title", async () => {
+    const t = await bookends();
+    await t.withIdentity(ann).mutation(api.follows.follow, { kind: "topic", value: "Flock, Van Buren Streets", label: "My concern" });
+    await t.withIdentity(bo).mutation(api.follows.follow, { kind: "topic", value: "data centers, tavern", label: "Other" });
+    expect((await t.withIdentity(ann).query(api.follows.myFollows, {}))![0]).toMatchObject({ kind: "topic", value: "flock, van buren streets", label: "My concern" });
+    await decide(t);
+    await t.action(internal.watcher.runWatcher, {});
+    expect((await alertsOf(t, ann)).map((a) => a.href)).toEqual(["/files/260533"]);
+    expect(await alertsOf(t, bo)).toEqual([]);
+    await t.withIdentity(ann).mutation(api.follows.unfollow, { kind: "topic", value: "flock, van buren streets" });
+    expect(await t.withIdentity(ann).query(api.follows.myFollows, {})).toEqual([]);
+  });
   it("an address follow matches a lot within half a mile", async () => {
     const t = await bookends();
     await t.withIdentity(ann).mutation(api.follows.follow, { kind: "address", value: "43.0430,-87.9000", label: "Near home" });

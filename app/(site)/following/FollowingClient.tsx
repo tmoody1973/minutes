@@ -53,7 +53,7 @@ function WatchList() {
         <p className="text-sm text-muted">Loading…</p>
       ) : !follows?.length ? (
         <p className="text-sm text-muted">
-          Nothing yet. Follow a file from its page, or your area from <Link href="/near">Near me</Link>.
+          Nothing yet. <Link href="/ask">Ask about something</Link> and follow it, follow a file from its page, or your area from <Link href="/near">Near me</Link>.
         </p>
       ) : (
         <ul className="flex flex-col">
@@ -62,6 +62,7 @@ function WatchList() {
               <span className="text-[15px]">
                 <span className="font-mono text-[11px] font-semibold tracking-[0.06em] text-muted">{KIND[f.kind].toUpperCase()} · </span>
                 {f.kind === "file" ? <Link href={`/files/${f.value}`}>{f.label}</Link> : f.label}
+                {f.kind === "topic" && f.label !== f.value && <span className="block text-[13px] text-muted">Watching for: {f.value}</span>}
               </span>
               <button type="button" onClick={() => unfollow({ kind: f.kind, value: f.value })} className="min-h-11 text-sm font-semibold text-link underline underline-offset-[0.18em] hover:text-ink">
                 Stop following

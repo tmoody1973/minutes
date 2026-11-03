@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { concernWords } from "../lib/watcher/match";
 
 const kindV = v.union(v.literal("file"), v.literal("address"), v.literal("alder"), v.literal("topic"));
 type Kind = "file" | "address" | "alder" | "topic";
@@ -24,9 +25,12 @@ export function normalizeFollow(kind: Kind, raw: string): string {
       if (!Number.isInteger(n) || n < 1 || n > 15) throw new Error("Milwaukee has aldermanic districts 1 to 15.");
       return String(n);
     }
-    case "topic":
-      if (value.length < 2 || value.length > 60) throw new Error("A topic is 2 to 60 characters.");
-      return value.toLowerCase();
+    case "topic": {
+      // A concern: up to 5 comma-separated watch words (Follow this).
+      const words = concernWords(value.split(","));
+      if (!words.length) throw new Error("Add at least one word of 3 or more letters to watch for.");
+      return words.join(", ");
+    }
   }
 }
 
