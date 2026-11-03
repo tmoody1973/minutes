@@ -20,6 +20,8 @@ import { convexRun } from "./convex-run";
 
 const MODEL = "muse-spark-1.3";
 const BATCH_BYTES = 150_000;
+// Caption lines are short, so a byte cap alone packs ~1,500 into one call; production timed out on that (13503).
+const TURNS_PER_CALL = 500;
 const UA = "Minutes/0.1 (tarik@radiomilwaukee.org)";
 
 type StoredChapter = { namesFingerprint?: string; eventItemId: number; startMs?: number; endMs?: number; located: string; parts: ChapterPart[]; partsSource?: "model" | "none"; partsReason?: string };
@@ -53,7 +55,7 @@ async function loadTurns(eventId: number, clipId: number | null, allowCaptions: 
 const turnRow = (t: Turn, source: "transcript" | "captions") => ({ turnKey: t.turnKey, chunk: t.chunk, startMs: t.startMs, endMs: t.endMs, ...(t.label ? { label: t.label } : {}), text: t.text, source });
 
 async function writeTurns(eventId: number, turns: Turn[], source: "transcript" | "captions") {
-  for (const turns_ of batchBySize(turns.map((t) => turnRow(t, source)), BATCH_BYTES)) convexRun("media:upsertTurns", { eventId, turns: turns_ });
+  for (const turns_ of batchBySize(turns.map((t) => turnRow(t, source)), BATCH_BYTES, TURNS_PER_CALL)) convexRun("media:upsertTurns", { eventId, turns: turns_ });
   const keep = new Set(turns.map((t) => t.turnKey));
   const stored: string[] = [];
   for (let cursor: string | null = null, first = true; first || cursor; first = false) {
