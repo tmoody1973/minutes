@@ -9,7 +9,12 @@ const sentence = (s: string) => {
 
 // The timeline's own markers (lib/timeline/build.ts) read as plain words; Legistar actions are kept, only re-cased.
 const MARKERS: Record<string, string> = { SCHEDULED: "Scheduled", "ON AGENDA": "On the agenda" };
-export const actionText = (actions: string[]) => actions.map((a) => MARKERS[a] ?? sentence(a)).join("; ");
+// A meeting can act on one file many times (115 budget amendments on one day): repeats are counted, not listed.
+export const actionText = (actions: string[]) => {
+  const counts = new Map<string, number>();
+  for (const a of actions.map((x) => MARKERS[x] ?? sentence(x))) counts.set(a, (counts.get(a) ?? 0) + 1);
+  return [...counts].map(([a, n]) => (n > 1 ? `${a}, ${n} times` : a)).join("; ");
+};
 
 export function tallyText(t: Tally): string {
   const extra = [t.excused && `${t.excused} excused`, t.other && `${t.other} other`].filter(Boolean);
