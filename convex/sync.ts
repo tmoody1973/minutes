@@ -10,8 +10,11 @@ import { eventsFilter, hasVotes, isMatterFresh, matterIdsOf, memberFilter } from
 
 type Raw = Record<string, unknown>;
 
-// Council 1, Zoning/Neighborhoods/Development 11, City Plan Commission 272.
-const BODY_IDS = [1, 11, 272];
+// All of City Hall's deciding bodies (Tarik, 2026-11-02): Common Council 1; standing committees Finance & Personnel 5,
+// Judiciary & Legislation 6, Public Works 7, Steering & Rules 9, Licenses 10, Zoning/Neighborhoods/Development 11,
+// Community & Economic Development 199, Public Safety & Health 320; commissions Historic Preservation 254,
+// City Plan 272, Fire & Police 333. Retired bodies 8 and 368 have no 2026 meetings.
+const BODY_IDS = [1, 5, 6, 7, 9, 10, 11, 199, 254, 272, 320, 333];
 // Fan-out spacing: scheduled jobs start this far apart so Legistar (a public city API) sees a trickle.
 const STAGGER_MS = 1000;
 const PARCEL_RECHECK_MS = 7 * 86_400_000;
@@ -169,7 +172,7 @@ export const syncMatter = internalAction({
   },
 });
 
-// Current members of the three bodies (office record not yet ended); title becomes the role.
+// Current members of the synced bodies (office record not yet ended); title becomes the role.
 // A person on several bodies gets one membership row per body.
 export const syncPersons = internalAction({
   args: {},

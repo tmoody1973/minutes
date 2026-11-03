@@ -3,19 +3,21 @@
 // Spec decision "Disclosure": verbatim on every project and meeting screen, the About page and the README.
 export const DISCLOSURE = "Built by Tarik Moody, a sitting member of the City Plan Commission. Public records only, no recommendations.";
 
-export type NavIcon = "week" | "pin" | "video" | "bookmark";
+export type NavIcon = "ask" | "week" | "pin" | "video" | "bookmark";
 
 // One label set on every width (Tarik, 2026-10-29); order follows the phone mockup.
 export const NAV: readonly { href: string; label: string; icon: NavIcon }[] = [
+  // All of City Hall, Ask first (UX brief 2026-11-02). Near me moved to the header's address chip.
+  { href: "/", label: "Ask", icon: "ask" },
   { href: "/week", label: "This week", icon: "week" },
-  { href: "/near", label: "Near me", icon: "pin" },
   { href: "/meetings", label: "Meetings", icon: "video" },
   { href: "/following", label: "Following", icon: "bookmark" },
 ];
 
 // "/" is current only on the home page; other tabs stay current on their child pages (/meetings/123).
 export function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  // Home is the Ask tab; an answer page (/ask) keeps it current.
+  if (href === "/") return pathname === "/" || pathname === "/ask";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

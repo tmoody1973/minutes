@@ -19,7 +19,7 @@ const bodyName = (name: string) => (label(name) === "Zoning, Neighborhoods & Dev
 
 // The records a file card may cite, keyed like the rest of the app (history:<id> matches the Watcher's change keys).
 // Never the owner: parcels are read for address, zoning, lot size and district only.
-async function fileSources(ctx: QueryCtx, fileNumber: string): Promise<Record<string, Source> | null> {
+export async function fileSources(ctx: QueryCtx, fileNumber: string): Promise<Record<string, Source> | null> {
   const m = await ctx.db.query("matters").withIndex("by_fileNumber", (q) => q.eq("fileNumber", fileNumber)).first();
   if (!m) return null;
   const out: Record<string, Source> = {

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as ask from "../ask.js";
 import type * as crons from "../crons.js";
 import type * as editor from "../editor.js";
 import type * as files from "../files.js";
@@ -29,6 +30,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  ask: typeof ask;
   crons: typeof crons;
   editor: typeof editor;
   files: typeof files;
