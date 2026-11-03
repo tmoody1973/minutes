@@ -15,6 +15,14 @@ describe("alertMessage (record fields only)", () => {
       message: "3473 S. 27th St.: Passed at Common Council, Oct 13, 2026.",
       href: "/files/260532",
     }));
+  it("a file with no address is named by its title's own subject, quoted from the record", () => {
+    const ALPR = "A substitute charter ordinance relating to contracts for automated license plate reader technology.";
+    expect(alertMessage({ kind: "decision", fileNumber: "260809", title: ALPR, bodyName: "FINANCE & PERSONNEL COMMITTEE", date: "2026-10-28T00:00:00", actionName: "RECOMMENDED FOR PASSAGE" }).message).toBe(
+      "File 260809 (contracts for automated license plate reader technology): Recommended for passage at Finance & Personnel Committee, Oct 28, 2026.",
+    );
+    const long = `Communication relating to ${"the annual report of the department ".repeat(4)}.`;
+    expect(alertMessage({ kind: "decision", fileNumber: "260001", title: long, date: "2026-10-28T00:00:00" }).message).toMatch(/^File 260001 \(the annual report .{20,90}…\): /);
+  });
   it("missing record fields leave words out rather than guess", () =>
     expect(alertMessage({ kind: "decision", fileNumber: "260532", title: "A resolution.", date: "2026-10-13T00:00:00" }).message).toBe(
       "File 260532: Decision recorded, Oct 13, 2026.",

@@ -56,6 +56,14 @@ describe("runAgent", () => {
     expect(toolMsg && "content" in toolMsg ? toolMsg.content : "").toContain("[matter:1] File 251665");
   });
 
+  it("passes on Muse's proposed words to follow, cleaned, and none when it proposes none", async () => {
+    const verify = async () => ({ supported: true, reason: "" });
+    const proposed = { sentences: [], follow: { name: "  Police surveillance cameras ", words: ["Camera", "flock", "camera", "x", 7, "license plate reader", "a", "b", "c", "d", "e"] } };
+    const out = await runAgent("cameras", tools, { chat: scripted(proposed).chat, verify });
+    expect(out.follow).toEqual({ name: "Police surveillance cameras", words: ["camera", "flock", "license plate reader"] });
+    expect((await runAgent("cameras", tools, { chat: scripted({ sentences: [] }).chat, verify })).follow).toBeUndefined();
+  });
+
   it("returns no sentences when the records don't answer", async () => {
     const { chat } = scripted({ sentences: [] });
     const out = await runAgent("Will it rain?", tools, { chat, verify: async () => ({ supported: true, reason: "" }) });

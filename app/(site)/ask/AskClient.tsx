@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Answer } from "../../../lib/ask/agent";
+import { FollowConcern } from "./FollowConcern";
 
 // Questions answered from the records during testing (Nov 2, 2026); never invented.
 export const EXAMPLES = [
@@ -301,7 +302,7 @@ function Steps({ steps, working }: { steps: string[]; working: boolean }) {
 }
 
 function AnswerView({ answer }: { answer: Answer }) {
-  const { sentences, rejected, records } = answer;
+  const { sentences, rejected, records, follow } = answer;
   return (
     <div className="flex flex-col gap-5 transition-[opacity,translate] duration-500 ease-out starting:translate-y-1 starting:opacity-0">
       {sentences.length ? (
@@ -372,6 +373,8 @@ function AnswerView({ answer }: { answer: Answer }) {
           </ul>
         </section>
       )}
+
+      <FollowConcern proposed={follow} />
     </div>
   );
 }

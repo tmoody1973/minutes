@@ -6,8 +6,18 @@ export type AlertFacts =
   | { kind: "hearing_scheduled"; fileNumber: string; title: string; bodyName?: string; startsAt?: string }
   | { kind: "decision"; fileNumber: string; title: string; bodyName?: string; date: string; actionName?: string };
 
+const SUBJECT_MAX = 90;
+// A file with no address (most of City Hall) is named by its title's own words after "relating to", cut at a word.
+function subjectOf(title: string): string | null {
+  const m = /relating to (.+?)\.?$/i.exec(title.replace(/\s+/g, " ").trim());
+  if (!m) return null;
+  return m[1].length <= SUBJECT_MAX ? m[1] : `${m[1].slice(0, SUBJECT_MAX).replace(/\s+\S*$/, "")}…`;
+}
+
 export function alertMessage(f: AlertFacts): { message: string; href: string } {
-  const heading = placeHeading(f.title, f.fileNumber);
+  const place = placeHeading(f.title, f.fileNumber);
+  const subject = place === `File ${f.fileNumber}` ? subjectOf(f.title) : null;
+  const heading = subject ? `${place} (${subject})` : place;
   const href = `/files/${f.fileNumber}`;
   if (f.kind === "hearing_scheduled") {
     const where = f.bodyName ? `the ${bodyLabel(f.bodyName)} agenda` : "a meeting agenda";

@@ -18,6 +18,15 @@ export interface MatterContext {
 // Quiet by default (spec): only hearings and decisions reach anyone; an added step is not news on its own.
 export const alertable = (kind: Change["kind"]) => kind === "hearing_scheduled" || kind === "decision";
 
+// A concern's watch words (Follow this): lowercase, 3 to 40 characters, distinct, at most 5. Anything else is dropped.
+export const MAX_CONCERN_WORDS = 5;
+export function concernWords(raw: unknown[]): string[] {
+  const words = raw.flatMap((w) => (typeof w === "string" ? [w.replace(/\s+/g, " ").trim().toLowerCase()] : []));
+  const kept = [...new Set(words.filter((w) => w.length >= 3 && w.length <= 40))];
+  // "proposed 2027 budget" adds nothing once "2027 budget" is watched: any title with the longer has the shorter.
+  return kept.filter((w) => !kept.some((o) => o !== w && w.includes(o))).slice(0, MAX_CONCERN_WORDS);
+}
+
 function parseLatLng(value: string): LatLng | null {
   const [lat, lng] = value.split(",").map(Number);
   return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
@@ -36,8 +45,14 @@ export function matchesFollow(_change: Change, follow: Pick<Follow, "kind" | "va
       return Number.isInteger(district) && m.alders.includes(district);
     }
     case "topic": {
-      const topic = follow.value.trim().toLowerCase();
-      return topic.length > 0 && m.title.toLowerCase().includes(topic);
+      // A concern stores its words comma-separated; any one in the title is a match.
+      const title = m.title.toLowerCase();
+      return follow.value.split(",").some((w) => {
+        const word = w.trim().toLowerCase();
+        // "readers" also matches "reader": the singular is inside both forms.
+        const stem = /[^s]s$/.test(word) ? word.slice(0, -1) : word;
+        return stem.length > 0 && title.includes(stem);
+      });
     }
   }
 }
