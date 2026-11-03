@@ -50,9 +50,10 @@ function MeetingView({ view, event, initialItem }: { view: View; event: Event; i
   const { eventId } = useParams<{ eventId: string }>();
   const chapters = view.chapters;
   const initial = chapters.findIndex((c) => c.eventItemId === initialItem);
-  // Phone: the open chapter (-1 = none). Laptop: the shown chapter (first one when none is open).
+  // Phone: the open chapter (-1 = none). Laptop: the shown chapter (first playable one when none is open).
   const [open, setOpen] = useState(initial);
-  const shown = chapters[open >= 0 ? open : 0];
+  // With none open, show the first chapter the recording can play, not one the video index couldn't place.
+  const shown = chapters[open >= 0 ? open : Math.max(0, chapters.findIndex((c) => c.startMs !== null))];
   const [atMs, setAtMs] = useState(initial >= 0 ? (chapters[initial].startMs ?? 0) : 0);
   // Counts seek requests so choosing the same moment again (after scrubbing the player) still reloads it there.
   const [seeks, setSeeks] = useState(0);
