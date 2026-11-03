@@ -22,7 +22,7 @@ Minutes reads the records of the Common Council, its eight standing committees a
 | **Ask Minutes** | Type a question ("What has the city done about police surveillance cameras?"). Muse Spark looks things up in the synced records and answers in two to five plain sentences. Every sentence shows the files it came from, and a box explains the city's procedural terms ("held to call of the chair"). Sentences the records don't support are dropped before you see them. |
 | **Follow this** | Under every answer, Minutes proposes a few words to watch for in new file titles. Edit them, sign in, follow. Minutes emails you only when a matching file is put on an agenda or decided. Only the name and the words are saved, never the question. |
 | **File pages** | One file's path from introduction to the Mayor: every real step with its vote, a jump into the meeting video, the next hearing with an add-to-calendar file, and for zoning files the lot outline and what the zoning would change. |
-| **Readable meetings** | A three-hour meeting as chapters by agenda item, with the city's own video player jumping to any moment, the transcript, how each member voted, and public testimony in speaking order. |
+| **Meetings** | Every synced meeting, with its agenda and what was decided: each item's actions and vote count, who moved it, the clerk's note from the minutes, and a jump into the city's video. Eight meetings are also split into chapters with a transcript: four transcribed with speaker names, four from the city's own captions. |
 | **This week** | Files on an agenda in the next seven days and decisions from the last seven, sorted by topic. |
 | **Near me** | Type an address, see zoning and development files within half a mile. The address is used for the lookup and never stored. |
 | **Search** | Files and words said in meetings. |
@@ -61,6 +61,7 @@ The builder sits on the City Plan Commission, which is part of the demo. Neutral
 |---|---|---|
 | Records synced | Legistar every 30 minutes plus nightly; 1,817 files in the dev database on Nov 3 | `scripts/metrics.ts` |
 | Meetings transcribed | 4 (Sep 28 Plan Commission, Oct 6 and Oct 27 ZND committee, Oct 13 Common Council), 8.44 hours, 53 chunks, 0 failures | `DEVLOG.md` |
+| Meetings with chapters | 8 of about 210 synced meetings: 4 with Muse Voice Transcribe transcripts, 4 from city captions (Fire & Police, Public Safety & Health, Judiciary & Legislation, Historic Preservation); every other meeting shows its agenda and outcomes from the records | `DEVLOG.md` |
 | Transcription cost | $1.52 total, about $0.18 per hour | `DEVLOG.md` |
 | Editor trap test | 8 of 8 planted errors caught (wrong count, wrong date, invented reason, prediction, judging word, unsupported claim); both correct sentences passed | `scripts/editor-eval.ts` |
 | Editor in use | 5 of 378 written sentences rejected (1.3%), for example "…sold to Vliet Street Lofts, LLC": the records authorize accepting an offer, not a completed sale | `scripts/metrics.ts` |
@@ -83,6 +84,7 @@ Everything in this repository was written between Oct 29 and Nov 4, 2026, during
   7. Editor and Clerk writer (PR #13); batched sync writes (PR #14); landing and About pages (PR #15)
   8. All of City Hall and Ask Minutes ([decision 008](docs/decisions/008-all-of-city-hall-ask-first.md), PR #17)
   9. Ask reliability, honest votes, Follow this, plain answers and the action-terms box, demo replay, all-of-City-Hall copy (PRs #18–#24)
+  10. Every meeting listed with its agenda and the minutes' own words, video beside the content, chapters from city captions (PRs #26–#27)
 
 **Built with [Claude Code](https://claude.com/claude-code)** (Anthropic's coding agent), which wrote the code under the builder's direction; commits are co-authored accordingly. Meta's models run inside the product, as described above.
 
