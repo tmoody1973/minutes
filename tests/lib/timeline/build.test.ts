@@ -103,6 +103,19 @@ describe("buildTimeline", () => {
     expect(cpc.tally).toBeUndefined();
   });
 
+  it("shows a vote only when every vote on the file at that meeting had the same count", () => {
+    const matter = parseMatter(fx("matter-74560"));
+    const [h] = histories(74560);
+    const rows = [1, 2].map((id) => ({ ...h, legistarId: id, bodyName: "CITY PLAN COMMISSION", date: "2026-09-28T00:00:00", eventId: 13559 }));
+    const its = [item(11, 13559, 74560), item(12, 13559, 74560, { sequence: 2 })];
+    const t = (aye: number) => ({ aye, no: 0, excused: 0, other: 0 });
+    const [differ] = buildTimeline(matter, rows, its, events, new Map([[11, t(5)], [12, t(4)]]), NOW);
+    expect(differ.tally).toBeUndefined();
+    expect(differ.eventItemId).toBe(11);
+    const [agree] = buildTimeline(matter, rows, its, events, new Map([[11, t(5)], [12, t(5)]]), NOW);
+    expect(agree.tally).toEqual(t(5));
+  });
+
   it("fills event link from a later merged row when the first lacks one", () => {
     const matter = parseMatter(fx("matter-74560"));
     const [h] = histories(74560);

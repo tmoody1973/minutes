@@ -22,9 +22,15 @@ const rank = (body: string) => RANK.get(body) ?? 2;
 // Prefer the agenda row (non-null sequence) over minutes-only duplicates.
 const pick = (rows: EventItemRecord[]) => rows.find((i) => i.sequence !== null) ?? rows[0];
 
-function link(it: EventItemRecord | undefined, tallies: Map<number, Tally>): Partial<TimelineStep> {
-  if (!it) return {};
-  const tally = tallies.get(it.legistarId);
+const sameTally = (a: Tally, b: Tally) => a.aye === b.aye && a.no === b.no && a.excused === b.excused && a.other === b.other;
+
+// A step can stand for many votes on one file at one meeting (each budget amendment is its own agenda entry), and
+// history rows don't say which entry they came from. A vote is shown only when every one of them had the same count.
+function link(rows: EventItemRecord[], tallies: Map<number, Tally>): Partial<TimelineStep> {
+  if (!rows.length) return {};
+  const it = pick(rows);
+  const ts = rows.flatMap((r) => tallies.get(r.legistarId) ?? []);
+  const tally = ts.length && ts.every((t) => sameTally(t, ts[0])) ? ts[0] : undefined;
   return {
     eventItemId: it.legistarId,
     ...(it.videoStartSec !== undefined && { videoStartSec: it.videoStartSec }),
@@ -50,15 +56,14 @@ export function buildTimeline(
     const body = label(h.bodyName);
     const date = day(h.date);
     const key = `${body}|${date}`;
-    const it = h.eventId === undefined ? undefined
-      : pick(live.filter((i) => i.eventId === h.eventId && i.matterId === h.matterId));
+    const rows = h.eventId === undefined ? [] : live.filter((i) => i.eventId === h.eventId && i.matterId === h.matterId);
     let step = byKey.get(key);
     if (step) {
       step.actions.push(h.actionName);
       if (step.eventId === undefined && h.eventId !== undefined) Object.assign(step, { eventId: h.eventId });
-      if (step.eventItemId === undefined) Object.assign(step, link(it, tallies));
+      if (step.eventItemId === undefined) Object.assign(step, link(rows, tallies));
     } else {
-      step = { body, date, actions: [h.actionName], ...(h.eventId !== undefined && { eventId: h.eventId }), ...link(it, tallies), upcoming: false };
+      step = { body, date, actions: [h.actionName], ...(h.eventId !== undefined && { eventId: h.eventId }), ...link(rows, tallies), upcoming: false };
       byKey.set(key, step);
       outcomes.set(step, new Set());
       steps.push(step);

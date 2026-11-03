@@ -17,6 +17,13 @@ describe("actionText", () => {
     expect(actionText(["ASSIGNED TO", "REFERRED WITHOUT RECOMMENDATION AND ASSIGNED TO"])).toBe("Assigned; Referred without recommendation and assigned"));
 });
 
+describe("actionText repeats", () => {
+  it("counts a repeated action instead of listing it again", () =>
+    expect(actionText(["AMENDED", "AMENDED", "AMENDED (WITHDRAWN)", "AMENDED", "REFERRED WITHOUT RECOMMENDATION"])).toBe(
+      "Amended, 3 times; Amended (withdrawn); Referred without recommendation",
+    ));
+});
+
 describe("tallyText", () => {
   it("ayes and noes, then excused and other only when present", () => {
     expect(tallyText({ aye: 5, no: 0, excused: 2, other: 0 })).toBe("Vote 5–0, 2 excused");
