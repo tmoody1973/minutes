@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
 import { label } from "../lib/timeline/build";
-import { stepDate } from "../lib/ui/file";
+import { actionText, stepDate } from "../lib/ui/file";
 import { PART_LABELS } from "../lib/ui/meeting";
 import { parseZoningChange } from "../lib/zoning/change";
 import { evaluativeWord } from "../lib/editor/rules";
@@ -35,10 +35,11 @@ export async function fileSources(ctx: QueryCtx, fileNumber: string): Promise<Re
   const items = await ctx.db.query("eventItems").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect();
   const histories = await ctx.db.query("histories").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect();
   for (const h of histories.sort((a, b) => a.date.localeCompare(b.date))) {
-    const tally = items.find((i) => i.eventId === h.eventId && i.tally)?.tally;
+    // The agenda item's tally is its final vote: attach it to the matching step only, not to every amendment that day.
+    const tally = items.find((i) => i.eventId === h.eventId && i.tally && i.actionName && actionText([i.actionName]) === actionText([h.actionName]))?.tally;
     out[`history:${h.legistarId}`] = {
       label: `${label(h.bodyName)}, ${day(h.date)}`,
-      text: `${day(h.date)}: ${bodyName(h.bodyName)}: ${h.actionName.replace(/\s+/g, " ")}${outcome(h.passed)}.${tally ? ` Vote: ${tallyText(tally)}.` : ""}`,
+      text: `${day(h.date)}: ${bodyName(h.bodyName)}: ${actionText([h.actionName])}${outcome(h.passed)}.${tally ? ` Vote: ${tallyText(tally)}.` : ""}`,
     };
   }
   // Hearings on an agenda with no action recorded yet.

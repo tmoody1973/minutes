@@ -13,6 +13,8 @@ describe("actionText", () => {
     expect(actionText(["SCHEDULED"])).toBe("Scheduled");
     expect(actionText(["ON AGENDA"])).toBe("On the agenda");
   });
+  it("drops the dangling 'to' Legistar leaves when the receiving body sits in another column", () =>
+    expect(actionText(["ASSIGNED TO", "REFERRED WITHOUT RECOMMENDATION AND ASSIGNED TO"])).toBe("Assigned; Referred without recommendation and assigned"));
 });
 
 describe("tallyText", () => {

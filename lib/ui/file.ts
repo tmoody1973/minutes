@@ -1,8 +1,9 @@
 // Display helpers for the project page (mockup MinPhoneTracker). Pure: safe in client and server code.
 import type { Tally } from "../types";
 
+// Legistar's "ASSIGNED TO" keeps the receiving body in a column Minutes doesn't sync; the dangling "to" is dropped.
 const sentence = (s: string) => {
-  const t = s.replace(/\s+/g, " ").trim().toLowerCase();
+  const t = s.replace(/\s+/g, " ").trim().replace(/ to$/i, "").toLowerCase();
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 

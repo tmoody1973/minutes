@@ -4,13 +4,12 @@ import { NEAR_KINDS } from "./locations";
 import { alertMessage } from "../lib/watcher/message";
 import { label } from "../lib/timeline/build";
 import { topicOfBody, topicOfFile, type Topic } from "../lib/topics";
-import { stepDate } from "../lib/ui/file";
+import { actionText, stepDate } from "../lib/ui/file";
 
 const WEEK_MS = 7 * 86_400_000;
 const MAX_ITEMS = 200;
 
 export type WeekItem = { href: string; title: string; meta?: string; topic: Topic; at: string };
-const sentenceCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 // Public, read-only: "This week at City Hall" across every synced body (decision 008). Each file appears once per
 // group, sorted into a topic by the committee rule (lib/topics). Zoning files keep the Watcher's address-led wording;
@@ -73,7 +72,7 @@ export const weekAtCityHall = query({
       }
       const m = await ctx.db.query("matters").withIndex("by_legistarId", (q) => q.eq("legistarId", h.matterId)).unique();
       if (m)
-        decided.push({ href: `/files/${m.fileNumber}`, title: m.title, meta: `${sentenceCase(h.actionName.replace(/\s+/g, " ").trim())} at ${label(h.bodyName)}, ${stepDate(h.date.slice(0, 10))}`, topic, at: h.date });
+        decided.push({ href: `/files/${m.fileNumber}`, title: m.title, meta: `${actionText([h.actionName])} at ${label(h.bodyName)}, ${stepDate(h.date.slice(0, 10))}`, topic, at: h.date });
     }
 
     return { comingUp: comingUp.slice(0, MAX_ITEMS), decided };
