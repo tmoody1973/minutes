@@ -21,6 +21,15 @@ export function tallyText(t: Tally): string {
   return [`Vote ${t.aye}–${t.no}`, ...extra].join(", ");
 }
 
+const SUBJECT_MAX = 90;
+// A file with no address (most of City Hall) is named by its title's own words after "relating to", cut at a word.
+export function subjectOf(title: string): string | null {
+  // "relating to its use of cameras": "its" points back at the sender, which the subject alone doesn't name.
+  const m = /relating to (?:its |their )?(.+?)\.?$/i.exec(title.replace(/\s+/g, " ").trim());
+  if (!m) return null;
+  return m[1].length <= SUBJECT_MAX ? m[1] : `${m[1].slice(0, SUBJECT_MAX).replace(/\s+\S*$/, "")}…`;
+}
+
 // "2026-09-28" -> "Sep 28, 2026"; with the meeting's start time -> "Wed, Nov 4, 9:00 AM" (Milwaukee time).
 export function stepDate(date: string, startsAt?: string): string {
   if (startsAt) {

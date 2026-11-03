@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { FileClient } from "./FileClient";
 
-export const metadata: Metadata = { title: "Project" };
+export const metadata: Metadata = { title: "File" };
 
 // FileClient reads the file number from the URL, which cacheComponents requires inside <Suspense>.
 export default function FilePage() {

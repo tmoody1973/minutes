@@ -11,8 +11,8 @@ const button = "inline-flex min-h-12 items-center justify-center rounded-xl px-5
 
 const FEATURES: { title: string; body: string; href: string; link: string }[] = [
   {
-    title: "Follow a project from start to finish",
-    body: "Every step from Council introduction to the Mayor's signature, with dates, each vote and the moment in the meeting video.",
+    title: "Follow a file from start to finish",
+    body: "Every step from introduction through committee and Council to the Mayor's signature, with dates, each vote and the moment in the meeting video.",
     href: "/files/260533",
     link: "See 711 E. Kilbourn Ave.",
   },
@@ -24,9 +24,9 @@ const FEATURES: { title: string; body: string; href: string; link: string }[] = 
   },
   {
     title: "Hear about it only when it matters",
-    body: "Follow a file, your area or your alderperson. Minutes emails you when a hearing is set or a decision is made, and stays quiet otherwise.",
-    href: "/following",
-    link: "Start following",
+    body: "Ask about anything, then follow it. Or follow a file, your area or your alderperson. Minutes emails you when a hearing is set or a decision is made, and stays quiet otherwise.",
+    href: "/ask",
+    link: "Ask, then follow",
   },
 ];
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionText, commentPage, COMMENT_PAGES, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../lib/ui/file";
+import { actionText, commentPage, COMMENT_PAGES, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../lib/ui/file";
 
 const BOOKENDS =
   "A substitute ordinance relating to the change in zoning from General Planned Development known as Bookends to a Detailed Planned Development known as Zenith to allow the construction of a multi-family residential building at 711 East Kilbourn Avenue and 822 North Van Buren Street, on the east side of North Van Buren Street, south of East Kilbourn Avenue, in the 4th Aldermanic District.";
@@ -22,6 +22,14 @@ describe("actionText repeats", () => {
     expect(actionText(["AMENDED", "AMENDED", "AMENDED (WITHDRAWN)", "AMENDED", "REFERRED WITHOUT RECOMMENDATION"])).toBe(
       "Amended, 3 times; Amended (withdrawn); Referred without recommendation",
     ));
+});
+
+describe("subjectOf", () => {
+  it("names a file by its title's subject, without a dangling its or their", () => {
+    expect(subjectOf("Communication from the Mayor relating to the proposed 2027 budget.")).toBe("the proposed 2027 budget");
+    expect(subjectOf("Communication from the Milwaukee Police Department relating to its use of cameras.")).toBe("use of cameras");
+    expect(subjectOf("A resolution approving a lease.")).toBeNull();
+  });
 });
 
 describe("tallyText", () => {

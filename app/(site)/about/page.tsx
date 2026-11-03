@@ -39,6 +39,7 @@ const STAGES: { label: string; title: string; items: string[] }[] = [
       "Muse Voice Transcribe turns meeting audio into a transcript with speaker labels",
       "Muse Spark confirms speaker names found in the roll call and introductions",
       "Muse Spark splits each agenda item into presentation, testimony, discussion and vote",
+      "Muse Spark answers questions by looking up the records with tools (Ask Minutes)",
       "Muse Spark writes plain-language summaries, and a second Muse Spark check (the Editor) approves each sentence",
     ],
   },
@@ -46,10 +47,11 @@ const STAGES: { label: string; title: string; items: string[] }[] = [
     label: "4 · WHAT YOU SEE",
     title: "Minutes",
     items: [
-      "Project pages: where a file is in the process and how to be heard",
+      "Ask Minutes: plain answers, every sentence linked to its record",
+      "File pages: where a file is in the process and how to be heard",
       "Meetings as chapters you can jump to in the video",
       "Near me: what is proposed within half a mile",
-      "Following: an email only when a hearing is set or a decision is made",
+      "Following: an email only when a concern, file, area or alderperson you follow is scheduled or decided",
     ],
   },
 ];
@@ -57,7 +59,7 @@ const STAGES: { label: string; title: string; items: string[] }[] = [
 const NUMBERS: [string, string][] = [
   ["8.4 hours", "of meetings transcribed (4 meetings)"],
   ["$0.18", "per hour of audio to transcribe"],
-  ["1,126", "city files synced"],
+  ["1,817", "city files synced"],
   ["181", "files followed across Plan Commission, committee and Council"],
   ["188", "plain-language summaries, every sentence checked"],
   ["8 of 8", "planted errors caught in the Editor's test"],
@@ -66,7 +68,7 @@ const NUMBERS: [string, string][] = [
 export default function AboutPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-5 md:gap-7">
-      <PageIntro title="About Minutes">Milwaukee City Hall&rsquo;s land-use records, readable by anyone, at the depth they choose.</PageIntro>
+      <PageIntro title="About Minutes">Milwaukee City Hall&rsquo;s public records, readable by anyone, at the depth they choose.</PageIntro>
 
       <section aria-labelledby="disclosure-heading" className="rounded-[14px] border-2 border-link bg-tint p-4 md:p-5">
         <h2 id="disclosure-heading" className={mono}>
@@ -86,14 +88,16 @@ export default function AboutPage() {
         </h2>
         <div className="flex max-w-[65ch] flex-col gap-3 text-[17px] leading-[1.5]">
           <p>
-            Milwaukee publishes almost everything about how land gets used: proposals, staff reports, agendas, votes and hours of
-            meeting video. Almost nobody can use it. One project&rsquo;s records are spread across the City Plan Commission, a Common
-            Council committee and the full Council. Meetings run three hours. Nothing tells you which proposals touch your block, when
-            they will be heard, or how to speak up before it is decided.
+            Milwaukee publishes almost everything City Hall decides: proposals, staff reports, agendas, votes and hours of meeting
+            video. Almost nobody can use it. One file&rsquo;s records are spread across a committee, the full Common Council and
+            sometimes a commission. Meetings run three hours. Nothing tells you which files touch what you care about, when they will
+            be heard, or how to speak up before it is decided.
           </p>
           <p>
-            Minutes follows each development and zoning file from start to finish, turns each meeting into chapters you can read or
-            jump to, and tells you what is proposed near you, in plain words with the official record one tap away.
+            Minutes covers the Common Council, its committees and the City Plan, Fire &amp; Police and Historic Preservation
+            commissions. Ask it a question and it answers from the records. It follows each file from start to finish, turns meetings
+            into chapters you can read or jump to, shows what is proposed near you, and emails you when something you follow is
+            scheduled or decided. Plain words, with the official record one tap away.
           </p>
         </div>
       </section>
@@ -171,7 +175,7 @@ export default function AboutPage() {
             </div>
           ))}
         </dl>
-        <p className="text-[13px] text-muted">As of Nov 1, 2026.</p>
+        <p className="text-[13px] text-muted">As of Nov 3, 2026.</p>
       </section>
 
       <section aria-labelledby="limits-heading" className="flex flex-col gap-2">
@@ -183,6 +187,7 @@ export default function AboutPage() {
           <li>About half of meeting chapters can jump straight to their moment in the video; the rest link to the full recording.</li>
           <li>Transcripts are machine-made and lightly cleaned. Quotes link to the moment in the video so you can hear them yourself.</li>
           <li>Summaries are dated and refreshed by hand, so the city&rsquo;s own record is always the final word.</li>
+          <li>Ask Minutes finds files by the words in their titles. If an answer comes back empty, try other words for the same thing.</li>
           <li>Minutes never submits comments for you. &ldquo;How to be heard&rdquo; links to the city&rsquo;s own instructions.</li>
         </ul>
       </section>
@@ -197,7 +202,8 @@ export default function AboutPage() {
           October&ndash;November 2026.
         </p>
         <p className="text-[15px]">
-          <Link href="/near">See what&rsquo;s proposed near you</Link> &middot; <Link href="/meetings">Read a meeting</Link>
+          <Link href="/ask">Ask a question</Link> &middot; <Link href="/near">See what&rsquo;s proposed near you</Link> &middot;{" "}
+          <Link href="/meetings">Read a meeting</Link>
         </p>
       </section>
     </div>

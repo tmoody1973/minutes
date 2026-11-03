@@ -1,18 +1,10 @@
 // The text of an alert, built only from stored record fields (records, not opinions). Pure.
-import { actionText, stepDate } from "../ui/file";
+import { actionText, stepDate, subjectOf } from "../ui/file";
 import { bodyLabel, placeHeading } from "../ui/near";
 
 export type AlertFacts =
   | { kind: "hearing_scheduled"; fileNumber: string; title: string; bodyName?: string; startsAt?: string }
   | { kind: "decision"; fileNumber: string; title: string; bodyName?: string; date: string; actionName?: string };
-
-const SUBJECT_MAX = 90;
-// A file with no address (most of City Hall) is named by its title's own words after "relating to", cut at a word.
-function subjectOf(title: string): string | null {
-  const m = /relating to (.+?)\.?$/i.exec(title.replace(/\s+/g, " ").trim());
-  if (!m) return null;
-  return m[1].length <= SUBJECT_MAX ? m[1] : `${m[1].slice(0, SUBJECT_MAX).replace(/\s+\S*$/, "")}…`;
-}
 
 export function alertMessage(f: AlertFacts): { message: string; href: string } {
   const place = placeHeading(f.title, f.fileNumber);

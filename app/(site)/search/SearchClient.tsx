@@ -2,17 +2,18 @@
 
 import { useQuery } from "convex/react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 
 const card = "rounded-xl border border-line bg-white";
 const mono = "font-mono text-[11px] font-semibold tracking-[0.06em] text-muted";
 
-// The query lives in the URL (?q=) so a search can be shared; results follow a 300 ms pause in typing.
+// The query lives in the URL (?q=) so a search can be shared; results follow a 300 ms pause in typing. The URL is
+// updated with the browser's own history API, which never asks the server, so typed words (maybe a home address)
+// don't reach request logs while someone types.
 export function SearchClient() {
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const [text, setText] = useState(params.get("q") ?? "");
   const [q, setQ] = useState(text.trim());
@@ -21,10 +22,10 @@ export function SearchClient() {
     const id = setTimeout(() => {
       const next = text.trim();
       setQ(next);
-      router.replace(next ? `${pathname}?q=${encodeURIComponent(next)}` : pathname, { scroll: false });
+      window.history.replaceState(null, "", next ? `${pathname}?q=${encodeURIComponent(next)}` : pathname);
     }, 300);
     return () => clearTimeout(id);
-  }, [text, pathname, router]);
+  }, [text, pathname]);
 
   const results = useQuery(api.search.search, q.length >= 2 ? { q } : "skip");
   const total = results ? results.files.length + results.quotes.length : 0;
