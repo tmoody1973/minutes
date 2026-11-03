@@ -17,6 +17,11 @@ async function seed() {
   await t.mutation(internal.legistar.upsertEventItem, { legistarId: 500, eventId: 50, sequence: 1, matterId: 1, fileNumber: "260001", title: "t", actionName: "REFERRED WITHOUT RECOMMENDATION AND ASSIGNED TO", passed: true });
   await t.mutation(internal.legistar.saveVotes, { eventItemId: 500, votes: [{ eventItemId: 500, personId: 9, personName: "A", value: "Aye" }], tally: { aye: 5, no: 0, excused: 0, other: 0 } });
   await t.mutation(internal.legistar.upsertHistory, { ...step(10, "ASSIGNED TO"), date: "2026-04-21T00:00:00", bodyName: "COMMON COUNCIL", eventId: undefined });
+  // Each amendment is its own agenda entry with its own vote, as on the real Oct 29 budget meeting.
+  for (const [n, aye] of [[501, 5], [502, 2]] as const) {
+    await t.mutation(internal.legistar.upsertEventItem, { legistarId: n, eventId: 50, sequence: n, matterId: 1, fileNumber: "260001", title: "t", actionName: "AMENDED", passed: false });
+    await t.mutation(internal.legistar.saveVotes, { eventItemId: n, votes: [{ eventItemId: n, personId: 9, personName: "A", value: "Aye" }], tally: { aye, no: 0, excused: 0, other: 0 } });
+  }
   for (const id of [11, 12, 13]) await t.mutation(internal.legistar.upsertHistory, step(id, "AMENDED", false));
   await t.mutation(internal.legistar.upsertHistory, step(14, "REFERRED WITHOUT RECOMMENDATION AND ASSIGNED TO", true));
   return t;
@@ -36,6 +41,7 @@ describe("fileRecords", () => {
     expect(texts.join(" ")).not.toMatch(/assigned to\b/i);
     expect(texts).toContain("File 260001, Apr 21, 2026: Common Council: Assigned.");
     expect(texts.find((s) => s.includes("Referred"))).toMatch(/Referred without recommendation and assigned \(passed\)\. Vote: 5 aye/);
+    // Two amendment entries that day with different votes: which vote goes with which step is unknown, so none is shown.
     expect(texts.find((s) => s.includes("Amended"))).not.toContain("Vote");
   });
 });

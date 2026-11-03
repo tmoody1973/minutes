@@ -35,8 +35,10 @@ export async function fileSources(ctx: QueryCtx, fileNumber: string): Promise<Re
   const items = await ctx.db.query("eventItems").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect();
   const histories = await ctx.db.query("histories").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect();
   for (const h of histories.sort((a, b) => a.date.localeCompare(b.date))) {
-    // The agenda item's tally is its final vote: attach it to the matching step only, not to every amendment that day.
-    const tally = items.find((i) => i.eventId === h.eventId && i.tally && i.actionName && actionText([i.actionName]) === actionText([h.actionName]))?.tally;
+    // A tally belongs to one agenda entry. Steps don't say which entry they came from, so a vote is shown only when
+    // exactly one entry that day took this action; the budget's dozens of amendments, each with its own vote, get none.
+    const same = items.filter((i) => i.eventId === h.eventId && i.actionName && actionText([i.actionName]) === actionText([h.actionName]));
+    const tally = same.length === 1 ? same[0].tally : undefined;
     out[`history:${h.legistarId}`] = {
       label: `${label(h.bodyName)}, ${day(h.date)}`,
       text: `${day(h.date)}: ${bodyName(h.bodyName)}: ${actionText([h.actionName])}${outcome(h.passed)}.${tally ? ` Vote: ${tallyText(tally)}.` : ""}`,
