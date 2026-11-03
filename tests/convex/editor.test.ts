@@ -24,7 +24,7 @@ describe("cardSources", () => {
     expect(storedHash).toBeNull();
     expect(sources!.map((s) => s.key)).toEqual(["matter:74560", "zoning:74560", "parcel:3930942000", "history:495640"]);
     const text = Object.fromEntries(sources!.map((s) => [s.key, s.text]));
-    expect(text["history:495640"]).toBe("Sep 28, 2026: City Plan Commission: APPROVED CONDITIONALLY (passed).");
+    expect(text["history:495640"]).toBe("Sep 28, 2026: City Plan Commission: Approved conditionally (passed).");
     expect(text["parcel:3930942000"]).toBe("Lot at 711 E KILBOURN AV: zoned PD, lot area 30,000 sq ft, aldermanic district 4.");
     expect(text["zoning:74560"]).toBe("Zoning change requested from General Planned Development (GPD) to Detailed Planned Development (DPD).");
     expect(JSON.stringify(sources)).not.toContain("OWNER");

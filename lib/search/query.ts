@@ -14,6 +14,15 @@ export function expandAddress(q: string): string {
     .join(" ");
 }
 
+// The title index matches whole words only ("license" never finds "licenses"), so each word also brings its other
+// form. ponytail: plain s-plural rule; irregular plurals ("policies") still need the agent's own rephrasing.
+const MAX_TERMS = 16; // Convex search allows at most 16 terms.
+export function withWordForms(q: string): string {
+  const other = (w: string) => (!/^[a-z]{4,}$/i.test(w) || /ss$/i.test(w) ? null : /s$/i.test(w) ? w.slice(0, -1) : `${w}s`);
+  const words = q.trim().split(/\s+/);
+  return words.flatMap((w) => [w, other(w)].filter((x): x is string => !!x && (x === w || !words.includes(x)))).slice(0, MAX_TERMS).join(" ");
+}
+
 const WINDOW = 220;
 
 /** About WINDOW characters of `text` around the first query word found, with "…" where it was cut. */

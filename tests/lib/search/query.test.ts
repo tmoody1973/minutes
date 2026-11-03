@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandAddress, snippet } from "../../../lib/search/query";
+import { expandAddress, snippet, withWordForms } from "../../../lib/search/query";
 
 describe("expandAddress", () => {
   it("spells out the abbreviations residents type, the way Legistar titles write them", () => {
@@ -8,6 +8,17 @@ describe("expandAddress", () => {
     expect(expandAddress("w good hope rd")).toBe("West good hope Road");
   });
   it("leaves ordinary words alone", () => expect(expandAddress("parking lot sale")).toBe("parking lot sale"));
+});
+
+describe("withWordForms", () => {
+  it("adds the other form of each word, since the title index matches whole words only", () => {
+    expect(withWordForms("liquor license")).toBe("liquor liquors license licenses");
+    expect(withWordForms("cameras budget 2027")).toBe("cameras camera budget budgets 2027");
+  });
+  it("leaves short words and words ending in ss alone, and stays under the index's 16 terms", () => {
+    expect(withWordForms("the bus class")).toBe("the bus class");
+    expect(withWordForms("word ".repeat(12)).split(" ").length).toBeLessThanOrEqual(16);
+  });
 });
 
 describe("snippet", () => {

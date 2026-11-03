@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { fileSources } from "./editor";
-import { expandAddress } from "../lib/search/query";
+import { expandAddress, withWordForms } from "../lib/search/query";
 import { label } from "../lib/timeline/build";
 import { TOPICS, topicOfFile } from "../lib/topics";
-import { stepDate } from "../lib/ui/file";
+import { actionText, stepDate } from "../lib/ui/file";
 import { clock } from "../lib/ui/meeting";
 
 // Ask Minutes' lookups (decision 008). Each returns records keyed like the Editor's sources, so an answer sentence can
@@ -21,7 +21,7 @@ export const findFiles = query({
     const exact = /^\d{5,7}$/.test(text)
       ? await ctx.db.query("matters").withIndex("by_fileNumber", (x) => x.eq("fileNumber", text)).first()
       : null;
-    const titled = await ctx.db.query("matters").withSearchIndex("search_title", (x) => x.search("title", expandAddress(text))).take(MAX);
+    const titled = await ctx.db.query("matters").withSearchIndex("search_title", (x) => x.search("title", withWordForms(expandAddress(text)))).take(MAX);
     const matters = [...(exact ? [exact] : []), ...titled.filter((m) => m._id !== exact?._id)].slice(0, MAX);
     const out: Rec[] = [];
     for (const m of matters) {
@@ -29,7 +29,7 @@ export const findFiles = query({
         a.date.localeCompare(b.date),
       );
       const last = hist.at(-1);
-      const lastText = last ? ` Latest step: ${stepDate(last.date.slice(0, 10))}, ${label(last.bodyName)}, ${last.actionName.replace(/\s+/g, " ")}.` : "";
+      const lastText = last ? ` Latest step: ${stepDate(last.date.slice(0, 10))}, ${label(last.bodyName)}, ${actionText([last.actionName])}.` : "";
       out.push({
         key: `matter:${m.legistarId}`,
         label: `File ${m.fileNumber}`,
@@ -41,7 +41,8 @@ export const findFiles = query({
   },
 });
 
-// Every record behind one file: the same set its plain-language card may cite.
+// Every record behind one file: the same set its plain-language card may cite, except that identical steps (the
+// budget has dozens of "Amended (failed)" on one day) collapse into the first one's record with a count.
 export const fileRecords = query({
   args: { fileNumber: v.string() },
   handler: async (ctx, { fileNumber }): Promise<Rec[]> => {
@@ -49,10 +50,16 @@ export const fileRecords = query({
     if (!sources) return [];
     const n = fileNumber.trim();
     // Each step names its file, so a sentence citing only a step can still say which file it was.
-    return Object.entries(sources).map(([key, s]) => ({
-      key,
-      label: s.label,
-      text: key.startsWith("matter:") ? s.text : `File ${n}, ${s.text}`,
+    const groups = new Map<string, { key: string; label: string; n: number }>();
+    for (const [key, s] of Object.entries(sources)) {
+      const g = groups.get(s.text);
+      groups.set(s.text, g ? { ...g, n: g.n + 1 } : { key, label: s.label, n: 1 });
+    }
+    return [...groups].map(([text, g]) => ({
+      key: g.key,
+      label: g.label,
+      // "…: Amended (failed)." -> "…: Amended (failed), 3 times." (before any " Vote: …").
+      text: g.key.startsWith("matter:") ? text : `File ${n}, ${g.n > 1 ? text.replace(/\.(?= Vote:|$)/, `, ${g.n} times.`) : text}`,
       href: `/files/${n}`,
     }));
   },
