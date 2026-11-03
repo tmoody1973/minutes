@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chapterResult, chapterTitle, clock, meetingSummary, PART_LABELS, quoteCitation, testimonySpeakers, voteRows } from "../../../lib/ui/meeting";
+import { agendaRows, chapterResult, titleKind, chapterTitle, clock, meetingSummary, PART_LABELS, quoteCitation, testimonySpeakers, voteRows } from "../../../lib/ui/meeting";
 
 describe("clock", () => {
   it("h:mm:ss over an hour, m:ss under", () => {
@@ -29,6 +29,46 @@ describe("chapterResult", () => {
   it("nothing when the record has no action", () => expect(chapterResult({})).toBeNull());
 });
 
+describe("titleKind", () => {
+  it("names the kind of document from the title's opening words, so same-subject files can be told apart", () => {
+    expect(titleKind("A charter ordinance relating to implementation of various provisions of the 2027 budget.")).toBe("Charter ordinance");
+    expect(titleKind("A substitute ordinance relating to the change in zoning.")).toBe("Substitute ordinance");
+    expect(titleKind("Resolution relating to implementation of various provisions.")).toBe("Resolution");
+    expect(titleKind("Communication from the Mayor relating to the proposed 2027 budget.")).toBe("Communication");
+    expect(titleKind("Appointment of Jane Doe to the Board.")).toBeNull();
+  });
+});
+
+describe("agendaRows", () => {
+  const t = (aye: number) => ({ aye, no: 0, excused: 0, other: 0 });
+  const it_ = (legistarId: number, sequence: number | null, extra: object = {}) => ({ legistarId, sequence, title: "Communication from the Mayor relating to the proposed 2027 budget.", ...extra });
+  it("agenda items with a file, in agenda order, with the minutes' actions folded in and a vote only when all agree", () => {
+    const rows = agendaRows([
+      it_(3, 2, { fileNumber: "260654", actionName: "REFERRED  WITHOUT RECOMMENDATION", tally: t(5), videoStartSec: 900 }),
+      it_(1, 1, { fileNumber: "260001", actionName: "AMENDED", tally: t(5), videoStartSec: 83 }),
+      it_(10, null, { fileNumber: "260001", actionName: "AMENDED", tally: t(4), videoStartSec: 40 }),
+      it_(11, null, { fileNumber: "260001", actionName: "AMENDED (WITHDRAWN)" }),
+      it_(12, 5, { title: "This meeting will be webcast live." }), // no file: a notice, not an item
+      it_(13, null, { title: "Meeting convened at 9:38 a.m.", videoStartSec: 3 }),
+      it_(14, 6, { fileNumber: "260999", removedAt: 1 }),
+    ]);
+    expect(rows.map((r) => r.fileNumber)).toEqual(["260001", "260654"]);
+    expect(rows[0]).toMatchObject({ eventItemId: 1, actions: ["AMENDED", "AMENDED", "AMENDED (WITHDRAWN)"], startSec: 40 });
+    expect(rows[0].tally).toBeUndefined();
+    expect(rows[1]).toMatchObject({ actions: ["REFERRED  WITHOUT RECOMMENDATION"], tally: t(5), startSec: 900 });
+  });
+  it("carries the minutes' own words: the clerk's note, and who moved it when the item had one action", () => {
+    const [many, one] = agendaRows([
+      it_(1, 1, { fileNumber: "260001", actionName: "AMENDED", mover: "ALD. MOORE", minutesNote: "Appearing: Sarah Osborn, Budget Office" }),
+      it_(2, null, { fileNumber: "260001", actionName: "AMENDED", mover: "ALD. PEREZ" }),
+      it_(3, 2, { fileNumber: "260654", actionName: "PLACED ON FILE", mover: "ALD. MOORE", seconder: "ALD. PEREZ" }),
+    ]);
+    expect(many).toMatchObject({ note: "Appearing: Sarah Osborn, Budget Office" });
+    expect(many.mover).toBeUndefined(); // two motions, two movers: no single "moved by"
+    expect(one).toMatchObject({ mover: "Ald. Moore", seconder: "Ald. Perez" });
+  });
+});
+
 describe("meetingSummary", () => {
   it("length, decisions and named parts count only what the records hold", () =>
     expect(
@@ -37,6 +77,8 @@ describe("meetingSummary", () => {
         chapters: [{ endMs: 12_549_860, item: { actionName: "APPROVED" } }, { endMs: null, item: {} }, { endMs: 200, item: null }],
       }),
     ).toBe("3 hr 29 min of video · 1 decision"));
+  it("a meeting without chapters counts the agenda items acted on", () =>
+    expect(meetingSummary({ turns: [], chapters: [], agenda: [{ actions: ["AMENDED"] }, { actions: [] }, { actions: ["PLACED ON FILE"] }] })).toBe("2 decisions"));
 });
 
 it("part labels cover every stored kind", () =>

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { sourceDocs } from "../lib/ui/file";
+import { agendaRows } from "../lib/ui/meeting";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { nameSpeakers } from "../lib/media/speakers";
 import type { SpeakerAssignment, Turn } from "../lib/types";
@@ -139,9 +140,14 @@ export const itemsForEvent = internalQuery({
   },
 });
 
+// Paged: a long meeting's captions run past Convex's 8,192-item limit on one return value (Oct 29 budget: 16,350).
+const TURN_KEY_PAGE = 4000;
 export const turnKeysForEvent = internalQuery({
-  args: { eventId: v.number() },
-  handler: async (ctx, { eventId }) => (await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).collect()).map((t) => t.turnKey),
+  args: { eventId: v.number(), cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { eventId, cursor }) => {
+    const r = await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).paginate({ numItems: TURN_KEY_PAGE, cursor });
+    return { keys: r.page.map((t) => t.turnKey), cursor: r.isDone ? null : r.continueCursor };
+  },
 });
 
 export const sourceForEvent = internalQuery({
@@ -258,11 +264,13 @@ export const meetingView = query({
         : null,
       turns: turns.map((t, i) => ({ source: rows[i].source, turnKey: t.turnKey, startMs: t.startMs, endMs: t.endMs, text: t.text, label: t.label, display: names.get(t.turnKey)!.display, asHeard: names.get(t.turnKey)!.asHeard })),
       chapters: withItems,
+      // Without chapters, the page shows the agenda and what was decided, from the records alone.
+      agenda: chapters.length ? [] : agendaRows([...items.values()]),
     };
   },
 });
 
-// Read-only. Meetings with chapters (the ones Minutes has processed), newest first.
+// Read-only. Every synced meeting, newest first; the ones Minutes has split into chapters say how many.
 export const meetingList = query({
   args: {},
   handler: async (ctx) => {
@@ -270,11 +278,11 @@ export const meetingList = query({
     // ponytail: full chapters scan; a few dozen rows per meeting, fine until hundreds of meetings are processed.
     for (const c of await ctx.db.query("chapters").collect()) counts.set(c.eventId, (counts.get(c.eventId) ?? 0) + 1);
     const out = [];
-    for (const [eventId, chapters] of counts) {
-      const ev = await ctx.db.query("events").withIndex("by_legistarId", (q) => q.eq("legistarId", eventId)).unique();
-      if (!ev) continue;
-      const first = await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", eventId)).first();
-      out.push({ eventId, bodyName: ev.bodyName, startsAt: ev.startsAt, chapters, transcriptSource: (first?.source ?? "none") as "transcript" | "captions" | "none" });
+    // ponytail: every event, a few hundred a year; page or index by date if this grows into the thousands.
+    for (const ev of await ctx.db.query("events").collect()) {
+      const chapters = counts.get(ev.legistarId) ?? 0;
+      const first = chapters ? await ctx.db.query("turns").withIndex("by_event", (q) => q.eq("eventId", ev.legistarId)).first() : null;
+      out.push({ eventId: ev.legistarId, bodyName: ev.bodyName, startsAt: ev.startsAt, chapters, transcriptSource: (first?.source ?? "none") as "transcript" | "captions" | "none" });
     }
     return out.sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   },

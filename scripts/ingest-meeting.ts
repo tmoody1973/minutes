@@ -55,7 +55,13 @@ const turnRow = (t: Turn, source: "transcript" | "captions") => ({ turnKey: t.tu
 async function writeTurns(eventId: number, turns: Turn[], source: "transcript" | "captions") {
   for (const turns_ of batchBySize(turns.map((t) => turnRow(t, source)), BATCH_BYTES)) convexRun("media:upsertTurns", { eventId, turns: turns_ });
   const keep = new Set(turns.map((t) => t.turnKey));
-  const stale = convexRun<string[]>("media:turnKeysForEvent", { eventId }).filter((k) => !keep.has(k));
+  const stored: string[] = [];
+  for (let cursor: string | null = null, first = true; first || cursor; first = false) {
+    const page: { keys: string[]; cursor: string | null } = convexRun("media:turnKeysForEvent", { eventId, cursor });
+    stored.push(...page.keys);
+    cursor = page.cursor;
+  }
+  const stale = stored.filter((k) => !keep.has(k));
   for (const b of batchBySize(stale, BATCH_BYTES, 1000)) convexRun("media:removeTurns", { eventId, turnKeys: b });
   return stale.length;
 }
