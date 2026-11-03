@@ -4,6 +4,7 @@ import { agreedTally } from "../legistar/tally";
 import type { Tally } from "../types";
 import { actionText, stepDate, subjectOf, tallyText } from "./file";
 import { bodyLabel, placeHeading } from "./near";
+import { memberName } from "./people";
 
 // 2051000 -> "34:11"; 5832000 -> "1:37:12".
 export function clock(ms: number): string {
@@ -37,8 +38,7 @@ export function titleKind(title: string): string | null {
 export interface AgendaItem { legistarId: number; sequence: number | null; title: string; fileNumber?: string; actionName?: string; tally?: Tally; videoStartSec?: number; removedAt?: number; mover?: string; seconder?: string; minutesNote?: string }
 export interface AgendaRow { eventItemId: number; title: string; fileNumber: string; actions: string[]; tally?: Tally; startSec?: number; mover?: string; seconder?: string; note?: string }
 
-// Legistar writes members in capitals ("ALD. MOORE").
-const nameCase = (s: string) => s.trim().toLowerCase().replace(/(^|[\s.-])(\w)/g, (_, a, c) => a + c.toUpperCase());
+
 
 // A meeting without chapters, read from the records alone: each agenda item with a file, in agenda order. The minutes
 // add a row per further motion on the same file (each budget amendment is one), so those fold into their item; every
@@ -64,8 +64,8 @@ export function agendaRows(items: AgendaItem[]): AgendaRow[] {
       actions: all.flatMap((i) => (i.actionName ? [i.actionName] : [])),
       ...(tally && { tally }),
       ...(starts.length && { startSec: Math.min(...starts) }),
-      ...(only?.mover && { mover: nameCase(only.mover) }),
-      ...(only?.seconder && { seconder: nameCase(only.seconder) }),
+      ...(only?.mover && { mover: memberName(only.mover) }),
+      ...(only?.seconder && { seconder: memberName(only.seconder) }),
       ...(a.minutesNote && { note: a.minutesNote }),
     }];
   });

@@ -35,7 +35,7 @@ async function factsFor(ctx: MutationCtx, c: Doc<"changes">, m: Matter): Promise
   }
   const historyId = Number(c.sourceKey.replace(/^history:/, ""));
   const h = await ctx.db.query("histories").withIndex("by_legistarId", (q) => q.eq("legistarId", historyId)).unique();
-  return { kind: "decision", fileNumber: m.fileNumber, title: m.title, date: c.at, ...(h && { bodyName: h.bodyName, actionName: h.actionName }) };
+  return { kind: c.kind === "introduced" ? "introduced" : "decision", fileNumber: m.fileNumber, title: m.title, date: c.at, ...(h && { bodyName: h.bodyName, actionName: h.actionName }) };
 }
 
 // At most one alert per (user, sourceKey). Returns the new alert's id, or null if it already existed.

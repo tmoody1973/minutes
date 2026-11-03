@@ -12,7 +12,7 @@ const button = "inline-flex min-h-12 items-center justify-center rounded-xl px-5
 const field = "min-h-11 rounded-xl border-[1.5px] border-line bg-white px-3 text-base outline-none placeholder:text-muted focus:border-link";
 
 // Follow this (decision 008): Muse proposes the words, the person edits them, and only the name and words are saved,
-// never the question. The Watcher emails when a file whose title has any word is put on an agenda or decided.
+// never the question. The Watcher emails when a file whose title has any word is introduced, put on an agenda or decided.
 export function FollowConcern({ proposed }: { proposed?: Concern }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { isSignedIn } = useAuth();
@@ -44,8 +44,8 @@ export function FollowConcern({ proposed }: { proposed?: Concern }) {
           Following &ldquo;{name.trim() || words.join(", ")}&rdquo;
         </h2>
         <p className="text-[15px] text-muted">
-          Minutes will email you when a file with {words.length === 1 ? "this word" : "any of these words"} in its title is put on an agenda or
-          decided. <Link href="/following">See what you follow</Link>.
+          Minutes will email you when a file with {words.length === 1 ? "this word" : "any of these words"} in its title is introduced, put on an
+          agenda or decided. <Link href="/following">See what you follow</Link>.
         </p>
       </section>
     );
@@ -58,7 +58,7 @@ export function FollowConcern({ proposed }: { proposed?: Concern }) {
           Follow this
         </h2>
         <p className="text-[15px] text-muted">
-          Get an email when a file with any of these words in its title is put on an agenda or decided.
+          Get an email when a file with any of these words in its title is introduced, put on an agenda or decided.
         </p>
       </div>
 

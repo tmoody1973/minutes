@@ -124,7 +124,7 @@ export default defineSchema({
     .index("by_body", ["bodyId"])
     .index("by_person", ["personId"]),
   changes: defineTable({
-    kind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("step_added")),
+    kind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("introduced"), v.literal("step_added")),
     matterId: v.number(),
     eventId: v.optional(v.number()),
     at: v.string(),
@@ -157,7 +157,7 @@ export default defineSchema({
     userId: v.string(),
     sourceKey: v.string(),
     matterId: v.number(),
-    changeKind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("step_added")),
+    changeKind: v.union(v.literal("hearing_scheduled"), v.literal("decision"), v.literal("introduced"), v.literal("step_added")),
     message: v.string(),
     href: v.string(),
     createdAt: v.number(),
@@ -231,6 +231,14 @@ export default defineSchema({
   }).index("by_finishedAt", ["finishedAt"]),
   // ---- Milestone 7: Clerk cards and the Editor ----
   // Only Editor-approved sentences are stored. key = file number, or "eventId:eventItemId" for a chapter.
+  // Text of files' attached PDFs (staff reports, fiscal notes, contracts), for Ask to search and cite. One row per
+  // document, including scanned ones with no text (passages: 0), so a run never downloads the same PDF twice.
+  documents: defineTable({ hyperlink: v.string(), name: v.string(), matterId: v.number(), fileNumber: v.string(), passages: v.number(), at: v.number() })
+    .index("by_hyperlink", ["hyperlink"])
+    .index("by_matter", ["matterId"]),
+  docPassages: defineTable({ hyperlink: v.string(), name: v.string(), matterId: v.number(), fileNumber: v.string(), n: v.number(), text: v.string() })
+    .index("by_hyperlink", ["hyperlink"])
+    .searchIndex("search_text", { searchField: "text" }),
   cards: defineTable({
     kind: v.union(v.literal("file"), v.literal("chapter")),
     key: v.string(),

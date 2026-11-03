@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Following" };
 export default function FollowingPage() {
   return (
     <>
-      <PageIntro title="Following">Alerts only when a hearing is scheduled or a decision is made on something you follow.</PageIntro>
+      <PageIntro title="Following">Alerts only when something you follow is introduced, scheduled for a hearing or decided.</PageIntro>
       <FollowingClient />
     </>
   );

@@ -5,6 +5,10 @@ const BOOKENDS = "A substitute ordinance relating to the change in zoning ... at
 const SOUTHGATE = "A substitute ordinance relating to the 5th Amendment ... at 3473 South 27th Street, in the 11th Aldermanic District.";
 
 describe("alertMessage (record fields only)", () => {
+  it("an introduced file says what was done, where and when, and what Minutes does next", () =>
+    expect(alertMessage({ kind: "introduced", fileNumber: "260809", title: "A substitute charter ordinance relating to contracts for automated license plate reader technology.", bodyName: "COMMON COUNCIL", date: "2026-09-22T00:00:00", actionName: "ASSIGNED TO" }).message).toBe(
+      "New file: File 260809 (contracts for automated license plate reader technology): Assigned at Common Council, Sep 22, 2026. Minutes will email you when it is put on an agenda or decided.",
+    ));
   it("a scheduled hearing names the body and the meeting time in Milwaukee", () =>
     expect(alertMessage({ kind: "hearing_scheduled", fileNumber: "260533", title: BOOKENDS, bodyName: "COMMON COUNCIL", startsAt: "2026-11-04T09:00:00-06:00" })).toEqual({
       message: "711 E. Kilbourn Ave. and 822 N. Van Buren St. is on the Common Council agenda for Wed, Nov 4, 9:00 AM.",

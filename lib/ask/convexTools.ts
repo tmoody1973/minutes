@@ -10,6 +10,7 @@ export function convexTools(client: ConvexHttpClient, now = Date.now()): Tools {
     find_files: (q) => client.query(api.ask.findFiles, { q }),
     read_file: (fileNumber) => client.query(api.ask.fileRecords, { fileNumber }),
     find_moments: (q) => client.query(api.ask.findMoments, { q }),
+    find_in_documents: (q) => client.query(api.ask.findInDocuments, { q }),
     // Rounded to the hour so the query result can be cached.
     upcoming: (days) => client.query(api.ask.upcoming, { now: Math.floor(now / HOUR_MS) * HOUR_MS, days }),
   };

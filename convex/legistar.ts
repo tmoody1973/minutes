@@ -2,6 +2,7 @@ import { type Infer, v } from "convex/values";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { boxV, parcelV, tallyV } from "./schema";
 import { syncMatterLocation } from "./locations";
+import { isIntroduction } from "../lib/watcher/match";
 
 type Upserted = { inserted: boolean; changedFields: string[] };
 type LegistarTable = "events" | "eventItems" | "matters" | "histories" | "persons";
@@ -40,7 +41,7 @@ async function upsert(ctx: MutationCtx, table: LegistarTable, rec: Record<string
 // sourceKey is unique: the same real change can never produce a second row.
 async function recordChange(
   ctx: MutationCtx,
-  c: { kind: "hearing_scheduled" | "decision" | "step_added"; matterId: number; eventId?: number; at: string; sourceKey: string },
+  c: { kind: "hearing_scheduled" | "decision" | "introduced" | "step_added"; matterId: number; eventId?: number; at: string; sourceKey: string },
 ) {
   const dup = await ctx.db.query("changes").withIndex("by_sourceKey", (q) => q.eq("sourceKey", c.sourceKey)).first();
   if (!dup) await ctx.db.insert("changes", c);
@@ -229,7 +230,7 @@ async function saveHistory(ctx: MutationCtx, args: Infer<typeof historyV>) {
     const r = await upsert(ctx, "histories", args);
     if (r.inserted) {
       await recordChange(ctx, {
-        kind: args.passed !== undefined ? "decision" : "step_added",
+        kind: args.passed !== undefined ? "decision" : isIntroduction(args.actionName) ? "introduced" : "step_added",
         matterId: args.matterId,
         ...(args.eventId !== undefined && { eventId: args.eventId }),
         at: args.date,

@@ -10,6 +10,7 @@
 
 import type * as ask from "../ask.js";
 import type * as crons from "../crons.js";
+import type * as documents from "../documents.js";
 import type * as editor from "../editor.js";
 import type * as files from "../files.js";
 import type * as follows from "../follows.js";
@@ -18,6 +19,7 @@ import type * as locations from "../locations.js";
 import type * as media from "../media.js";
 import type * as metrics from "../metrics.js";
 import type * as near from "../near.js";
+import type * as people from "../people.js";
 import type * as search from "../search.js";
 import type * as sync from "../sync.js";
 import type * as watcher from "../watcher.js";
@@ -32,6 +34,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   ask: typeof ask;
   crons: typeof crons;
+  documents: typeof documents;
   editor: typeof editor;
   files: typeof files;
   follows: typeof follows;
@@ -40,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   media: typeof media;
   metrics: typeof metrics;
   near: typeof near;
+  people: typeof people;
   search: typeof search;
   sync: typeof sync;
   watcher: typeof watcher;

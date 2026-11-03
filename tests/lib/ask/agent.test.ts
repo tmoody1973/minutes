@@ -8,6 +8,7 @@ const tools: Tools = {
   find_files: async () => [rec("matter:1", "File 251665 (Communication): MPD use of cameras including Flock. Status: In Committee.")],
   read_file: async () => [rec("history:9", "Feb 10, 2026: Common Council: Assigned to Public Safety and Health Committee.")],
   find_moments: async () => [],
+  find_in_documents: async () => [],
   upcoming: async () => [],
 };
 

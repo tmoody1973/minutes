@@ -11,6 +11,6 @@ export interface Cue { kind: "self" | "recognized"; name: string; affiliation?: 
 export interface SpeakerAssignment { label: string; name: string; personId?: number; source: "legistar" | "self-intro" | "manual"; evidenceTurnKey: string; at?: number /* manual only: ms epoch, latest wins */; by?: string }
 export interface ChapterPart { kind: "presentation" | "applicant" | "testimony" | "discussion" | "vote"; startMs: number; endMs: number }
 export interface Chapter { eventItemId: number; startMs: number | null; endMs: number | null; located: "video-index" | "cue" | "not-located"; parts: ChapterPart[] }
-export interface Change { kind: "hearing_scheduled" | "decision" | "step_added"; matterId: number; eventId?: number; at: string; sourceKey: string }
+export interface Change { kind: "hearing_scheduled" | "decision" | "introduced" | "step_added"; matterId: number; eventId?: number; at: string; sourceKey: string }
 export interface Follow { userId: string; kind: "file" | "address" | "alder" | "topic"; value: string }
 export interface EditorVerdict { ok: boolean; reason?: "no-source" | "unknown-source" | "evaluative" | "unsupported" }

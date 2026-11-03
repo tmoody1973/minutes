@@ -51,7 +51,7 @@ const STAGES: { label: string; title: string; items: string[] }[] = [
       "File pages: where a file is in the process and how to be heard",
       "Meetings as chapters you can jump to in the video",
       "Near me: what is proposed within half a mile",
-      "Following: an email only when a concern, file, area or alderperson you follow is scheduled or decided",
+      "Following: an email only when something you follow is introduced, scheduled or decided",
     ],
   },
 ];

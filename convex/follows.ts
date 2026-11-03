@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { concernWords } from "../lib/watcher/match";
+import { isFileNumber } from "../lib/ui/file";
 
 const kindV = v.union(v.literal("file"), v.literal("address"), v.literal("alder"), v.literal("topic"));
 type Kind = "file" | "address" | "alder" | "topic";
@@ -12,8 +13,8 @@ export function normalizeFollow(kind: Kind, raw: string): string {
   const value = raw.trim();
   switch (kind) {
     case "file":
-      if (!/^\d{5,7}$/.test(value)) throw new Error("A file number is 5 to 7 digits.");
-      return value;
+      if (!isFileNumber(value)) throw new Error("A file number is 5 to 7 digits, or FPC and digits.");
+      return value.toUpperCase();
     case "address": {
       const parts = value.split(",");
       const [lat, lng] = parts.map((p) => (p.trim() ? Number(p) : NaN));

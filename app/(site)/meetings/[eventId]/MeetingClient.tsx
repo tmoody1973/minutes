@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { PlainCard } from "../../_components/PlainCard";
+import { HowToBeHeard, WhoDecides } from "../../_components/WhoDecides";
 import { downloadCsv } from "../../../../lib/ui/csv";
 import { actionText, tallyText } from "../../../../lib/ui/file";
 import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers, titleKind, voteRows } from "../../../../lib/ui/meeting";
@@ -229,6 +230,7 @@ function Player({ event, atMs, seeks }: { event: Event; atMs: number; seeks: num
 
 // A meeting Minutes hasn't split into chapters: the agenda and what was decided, from the city's records alone.
 function AgendaView({ view, event }: { view: View; event: Event }) {
+  const { eventId } = useParams<{ eventId: string }>();
   const [at, setAt] = useState({ ms: 0, seeks: 0 });
   const [upcoming] = useState(() => Date.parse(event.startsAt) > Date.now());
   const playerRef = useRef<HTMLDivElement>(null);
@@ -250,6 +252,8 @@ function AgendaView({ view, event }: { view: View; event: Event }) {
         <p className="max-w-[65ch] text-[14px] text-muted">
           Minutes hasn&apos;t transcribed this meeting. The agenda, actions and vote counts below come from the city&apos;s records.
         </p>
+        {upcoming && <HowToBeHeard body={bodyLabel(event.bodyName)} />}
+        {upcoming && <WhoDecides eventId={Number(eventId)} />}
       </header>
       <div ref={playerRef} className="flex scroll-mt-4 flex-col gap-3 md:sticky md:top-4 md:col-start-2 md:row-start-2">
         {upcoming ? <p className="text-[15px] text-muted">Video is posted by the city after the meeting.</p> : <Player event={event} atMs={at.ms} seeks={at.seeks} />}
