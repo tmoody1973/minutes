@@ -147,4 +147,32 @@ describe("Watcher", () => {
     expect(inbox).toHaveLength(1);
     expect(inbox[0]).toMatchObject({ replay: true, replayOf: "2026-11-04T00:00:00" });
   });
+  it("replays the latest real change for one of the admin's own follows, to the admin only, one step further back each time", async () => {
+    vi.stubEnv("ADMIN_USER_IDS", "admin1");
+    const admin = { tokenIdentifier: "clerk|admin1", subject: "admin1", email: "admin@example.org" };
+    const t = convexTest(schema, modules);
+    const cam = (id: number, file: string) =>
+      t.mutation(internal.legistar.upsertMatter, { legistarId: id, fileNumber: file, title: `Communication relating to license plate reader cameras ${file}.`, typeName: "Communication", statusName: "Placed On File" });
+    await cam(1, "260001");
+    await cam(2, "260002");
+    await t.mutation(internal.legistar.upsertMatter, { legistarId: 3, fileNumber: "260003", title: "A resolution relating to a tavern.", typeName: "Resolution", statusName: "Adopted" });
+    const decided = (h: number, matterId: number, date: string) =>
+      t.mutation(internal.legistar.upsertHistory, { legistarId: h, matterId, date, bodyName: "FIRE AND POLICE COMMISSION", actionName: "PLACED ON FILE", passed: true });
+    await decided(11, 1, "2026-05-07T00:00:00");
+    await decided(12, 2, "2026-10-15T00:00:00");
+    await decided(13, 3, "2026-10-20T00:00:00"); // newer, but not about cameras
+    for (const who of [admin, ann]) await t.withIdentity(who).mutation(api.follows.follow, { kind: "topic", value: "cameras", label: "Police cameras" });
+
+    await expect(t.withIdentity(ann).mutation(api.watcher.replayLatest, { kind: "topic", value: "cameras" })).rejects.toThrow(/admin/i);
+    expect(await t.withIdentity(admin).mutation(api.watcher.replayLatest, { kind: "topic", value: "cameras" })).toMatchObject({ replayOf: "2026-10-15T00:00:00" });
+    expect(await t.withIdentity(admin).mutation(api.watcher.replayLatest, { kind: "topic", value: "cameras" })).toMatchObject({ replayOf: "2026-05-07T00:00:00" });
+    await expect(t.withIdentity(admin).mutation(api.watcher.replayLatest, { kind: "topic", value: "cameras" })).rejects.toThrow(/no earlier/i);
+
+    const inbox = await alertsOf(t, admin);
+    expect(inbox.map((a) => a.href)).toEqual(expect.arrayContaining(["/files/260001", "/files/260002"]));
+    expect(inbox.every((a) => a.replay)).toBe(true);
+    expect(await alertsOf(t, ann)).toEqual([]);
+    expect(await t.withIdentity(admin).query(api.watcher.isAdmin, {})).toBe(true);
+    expect(await t.withIdentity(ann).query(api.watcher.isAdmin, {})).toBe(false);
+  });
 });

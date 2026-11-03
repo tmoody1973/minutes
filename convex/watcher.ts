@@ -180,12 +180,25 @@ export const emailAlerts = internalAction({
 
 // Admin only (ADMIN_USER_IDS = Clerk user ids, comma separated): re-sends a real past change to everyone following
 // it now, labeled "Replay of a real alert from {date}" (spec: the demo fallback if no live change arrives).
+const adminIds = () => (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+async function requireAdmin(ctx: MutationCtx) {
+  const id = await ctx.auth.getUserIdentity();
+  if (!id || !adminIds().includes(id.subject)) throw new Error("Only an admin can replay an alert.");
+  return id;
+}
+
+export const isAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const id = await ctx.auth.getUserIdentity();
+    return !!id && adminIds().includes(id.subject);
+  },
+});
+
 export const replayChange = mutation({
   args: { sourceKey: v.string() },
   handler: async (ctx, { sourceKey }) => {
-    const id = await ctx.auth.getUserIdentity();
-    const admins = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    if (!id || !admins.includes(id.subject)) throw new Error("Only an admin can replay an alert.");
+    await requireAdmin(ctx);
     const c = await ctx.db.query("changes").withIndex("by_sourceKey", (q) => q.eq("sourceKey", sourceKey)).unique();
     if (!c || !alertable(c.kind)) throw new Error(`No hearing or decision change with source key ${sourceKey}.`);
     const m = await matterContext(ctx, c.matterId);
@@ -202,6 +215,38 @@ export const replayChange = mutation({
 });
 
 // ---- the signed-in user's own data (null when signed out) ----
+
+const CANDIDATES_PER_WORD = 25;
+
+// Admin only, for demos: replays the newest real hearing or decision matching one of the admin's own file or topic
+// follows, to the admin alone (never to other followers). Each call goes one change further back, since a change
+// already replayed to this admin is skipped.
+export const replayLatest = mutation({
+  args: { kind: v.union(v.literal("file"), v.literal("topic")), value: v.string() },
+  handler: async (ctx, { kind, value }) => {
+    const id = await requireAdmin(ctx);
+    const f = await ctx.db.query("follows").withIndex("by_user_kind_value", (q) => q.eq("userId", id.tokenIdentifier).eq("kind", kind).eq("value", value)).unique();
+    if (!f) throw new Error("Follow this first, then replay it.");
+    const matters =
+      kind === "file"
+        ? await ctx.db.query("matters").withIndex("by_fileNumber", (q) => q.eq("fileNumber", value)).take(1)
+        : (await Promise.all(value.split(",").map((w) => ctx.db.query("matters").withSearchIndex("search_title", (q) => q.search("title", w.trim())).take(CANDIDATES_PER_WORD)))).flat();
+    const changes: { c: Doc<"changes">; m: Matter }[] = [];
+    for (const matterId of new Set(matters.map((m) => m.legistarId))) {
+      const m = await matterContext(ctx, matterId);
+      if (!m) continue;
+      const rows = await ctx.db.query("changes").withIndex("by_matter", (q) => q.eq("matterId", matterId)).collect();
+      for (const c of rows) if (alertable(c.kind) && matchesFollow(c, f, m)) changes.push({ c, m });
+    }
+    for (const { c, m } of changes.sort((a, b) => b.c.at.localeCompare(a.c.at))) {
+      const alertId = await createAlert(ctx, id.tokenIdentifier, `replay:${c.sourceKey}`, c, m, c.at);
+      if (!alertId) continue;
+      await ctx.scheduler.runAfter(0, internal.watcher.emailAlerts, { alertIds: [alertId] });
+      return { replayOf: c.at, href: `/files/${m.fileNumber}` };
+    }
+    throw new Error("No earlier real hearing or decision to replay for this follow.");
+  },
+});
 
 export const inbox = query({
   args: {},
