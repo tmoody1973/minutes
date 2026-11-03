@@ -10,7 +10,7 @@ import { granicusLink } from "../../../../lib/media/review";
 import { FollowButton } from "../../_components/FollowButton";
 import { PlainCard } from "../../_components/PlainCard";
 import { downloadCsv } from "../../../../lib/ui/csv";
-import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../../lib/ui/file";
+import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../../lib/ui/file";
 import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
 import { parseZoningChange } from "../../../../lib/zoning/change";
@@ -54,17 +54,21 @@ function useNow(): number {
 function FileView({ view }: { view: View }) {
   const { matter, timeline, parcels } = view;
   const now = useNow();
-  const heading = placeHeading(matter.title, matter.fileNumber);
+  // Most of City Hall is not zoning: those files are named by their title's subject and labeled with the city's file type.
+  const kind = parseZoningChange(matter.title).kind;
+  const place = placeHeading(matter.title, matter.fileNumber);
+  const subject = place === `File ${matter.fileNumber}` ? subjectOf(matter.title) : null;
+  const heading = subject ? subject.charAt(0).toUpperCase() + subject.slice(1) : place;
   // Re-checked against the clock: Convex re-runs fileView only when data changes, not as time passes, so a
   // stored `upcoming` can outlive the hearing.
   const next = timeline.find((s): s is Step & { startsAt: string; eventId: number } =>
     s.upcoming && s.startsAt !== undefined && s.eventId !== undefined && Date.parse(s.startsAt) > now,
   );
   const districts = [...new Set(parcels.map((p) => p.alder).filter((a) => a !== null))];
-  const label = [kindLabel(parseZoningChange(matter.title).kind), districts.length === 1 && `DISTRICT ${districts[0]}`, `FILE ${matter.fileNumber}`]
+  const label = [kind === "other" ? (matter.typeName ?? "File").toUpperCase() : kindLabel(kind), districts.length === 1 && `DISTRICT ${districts[0]}`, `FILE ${matter.fileNumber}`]
     .filter(Boolean)
     .join(" · ");
-  const purpose = purposeLine(matter.title);
+  const purpose = purposeLine(matter.title) ?? (kind === "other" ? matter.title : null);
 
   return (
     // One column at every width, in the mockup's phone order: reading, tab and screen-reader order all match.
