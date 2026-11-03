@@ -7,7 +7,10 @@ const LABELS = new Map([
   ["MAYOR", "Mayor"],
 ]);
 
-const titleCase = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\w)/g, (_, a, b) => a + b.toUpperCase());
+// Small words stay lowercase after the first ("Public Safety and Health Committee").
+const SMALL = new Set(["and", "of", "the", "for", "on", "to", "in"]);
+const titleCase = (s: string) =>
+  s.toLowerCase().replace(/(^|[\s-])(\w+)/g, (m, a, w, i) => (i > 0 && SMALL.has(w) ? m : a + w[0].toUpperCase() + w.slice(1)));
 /** Display name for a Legistar body, shared by the timeline and Near me so a body reads the same everywhere. */
 export const label = (name: string) => LABELS.get(name.trim().toUpperCase()) ?? titleCase(name.trim());
 const day = (iso: string) => iso.slice(0, 10);

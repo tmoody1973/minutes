@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { DISCLOSURE, isActive, NAV, weekOf } from "../../../lib/ui/shell";
 
 describe("isActive", () => {
-  it("home is current only on /", () => {
+  it("home (the Ask tab) is current on / and on an answer page, nowhere else", () => {
     expect(isActive("/", "/")).toBe(true);
+    expect(isActive("/ask", "/")).toBe(true);
     expect(isActive("/near", "/")).toBe(false);
   });
   it("other tabs stay current on child pages but not on look-alike paths", () => {
@@ -11,8 +12,8 @@ describe("isActive", () => {
     expect(isActive("/meetings/13559", "/meetings")).toBe(true);
     expect(isActive("/meetingsx", "/meetings")).toBe(false);
   });
-  it("no tab is current on the landing page", () => {
-    expect(NAV.filter((n) => isActive("/", n.href))).toHaveLength(0);
+  it("Ask is the one current tab on the landing page", () => {
+    expect(NAV.filter((n) => isActive("/", n.href)).map((n) => n.label)).toEqual(["Ask"]);
   });
   it("exactly one tab is current on each nav page", () => {
     for (const { href } of NAV) expect(NAV.filter((n) => isActive(href, n.href))).toHaveLength(1);

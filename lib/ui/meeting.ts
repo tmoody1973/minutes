@@ -1,8 +1,8 @@
 // Display helpers for the meeting page (mockups MinPhoneMeeting, MinLaptopMeeting). Pure: safe in client and server code.
 import { type StatedPosition, statedPosition } from "../media/positions";
 import type { Tally } from "../types";
-import { actionText, tallyText } from "./file";
-import { placeHeading } from "./near";
+import { actionText, stepDate, tallyText } from "./file";
+import { bodyLabel, placeHeading } from "./near";
 
 // 2051000 -> "34:11"; 5832000 -> "1:37:12".
 export function clock(ms: number): string {
@@ -26,6 +26,29 @@ export function chapterTitle(title: string, fileNumber?: string): string {
 export function chapterResult(item: { actionName?: string; tally?: Tally }): string | null {
   if (!item.actionName) return null;
   return item.tally ? `${actionText([item.actionName])}, ${tallyText(item.tally)}` : actionText([item.actionName]);
+}
+
+// "2026-09-28T17:30:00-05:00" -> "Sep 28, 2026": Legistar start times carry Milwaukee's offset, so the first ten
+// characters are the local date.
+export const meetingDate = (startsAt: string) => stepDate(startsAt.slice(0, 10));
+
+// A quote as a reporter pastes it: words, speaker as the page shows them (an unnamed "Speaker B" stays as is),
+// meeting, video time and a link that opens the chapter.
+export function quoteCitation(c: { quote: string; speaker: string; bodyName: string; startsAt: string; startMs: number; url: string }): string {
+  return `“${c.quote}” — ${c.speaker}, ${bodyLabel(c.bodyName)} meeting, ${meetingDate(c.startsAt)}, at ${clock(c.startMs)}. ${c.url}`;
+}
+
+// The meeting's votes as CSV rows, one per member vote. Every member's row is built the same way (Global Constraints).
+export function voteRows(
+  startsAt: string,
+  bodyName: string,
+  chapters: { item: { title: string; fileNumber?: string; actionName?: string; tally?: Tally } | null; votes: { name: string; value: string }[] }[],
+): string[][] {
+  const header = ["meeting_date", "body", "chapter", "file_number", "item_title", "result", "member", "vote"];
+  const rows = chapters.flatMap((c, i) =>
+    c.votes.map((v) => [startsAt.slice(0, 10), bodyLabel(bodyName), String(i + 1), c.item?.fileNumber ?? "", c.item?.title ?? "", (c.item && chapterResult(c.item)) ?? "", v.name, v.value]),
+  );
+  return [header, ...rows];
 }
 
 // Stored part kinds (lib/types ChapterPart) as people say them.

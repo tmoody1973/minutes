@@ -8,7 +8,8 @@ import { useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { PlainCard } from "../../_components/PlainCard";
-import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers } from "../../../../lib/ui/meeting";
+import { downloadCsv } from "../../../../lib/ui/csv";
+import { chapterResult, chapterTitle, clock, meetingSummary, testimonySpeakers, voteRows } from "../../../../lib/ui/meeting";
 import { bodyLabel } from "../../../../lib/ui/near";
 import { Parts, SourceNote, Transcript } from "../_components/MeetingBits";
 import { Quote } from "../_components/Quote";
@@ -17,6 +18,7 @@ import { VoteTable } from "../_components/VoteTable";
 type View = FunctionReturnType<typeof api.media.meetingView>;
 type Chapter = View["chapters"][number];
 type Turn = View["turns"][number];
+type Event = NonNullable<View["event"]>;
 
 const EVENT_ID = /^\d{1,7}$/;
 const card = "rounded-[14px] border border-line bg-white";
@@ -43,7 +45,7 @@ export function MeetingClient() {
   return <MeetingView view={view} event={view.event} initialItem={item} />;
 }
 
-function MeetingView({ view, event, initialItem }: { view: View; event: NonNullable<View["event"]>; initialItem: number | null }) {
+function MeetingView({ view, event, initialItem }: { view: View; event: Event; initialItem: number | null }) {
   const { eventId } = useParams<{ eventId: string }>();
   const chapters = view.chapters;
   const initial = chapters.findIndex((c) => c.eventItemId === initialItem);
@@ -73,6 +75,15 @@ function MeetingView({ view, event, initialItem }: { view: View; event: NonNulla
         <h1 className="text-[26px] font-extrabold leading-[1.15] md:text-[32px] md:tracking-[-0.01em]">{chapters.length ? `The meeting in ${chapters.length} ${chapters.length === 1 ? "chapter" : "chapters"}` : "This meeting"}</h1>
         <p className="max-w-[65ch] text-[15px] text-muted md:text-base">{meetingSummary(view)}</p>
         <SourceNote source={view.transcriptSource} />
+        {chapters.some((c) => c.votes.length > 0) && (
+          <button
+            type="button"
+            onClick={() => downloadCsv(`meeting-${eventId}-votes.csv`, voteRows(event.startsAt, event.bodyName, chapters))}
+            className="min-h-11 self-start text-sm font-semibold text-link underline underline-offset-[0.18em] hover:text-ink"
+          >
+            Download votes (CSV)
+          </button>
+        )}
         {!chapters.length && <p className="text-[15px] text-muted">This meeting hasn&apos;t been split into chapters yet.</p>}
       </header>
 
@@ -138,7 +149,7 @@ function MeetingView({ view, event, initialItem }: { view: View; event: NonNulla
               <div className="flex flex-col gap-4 px-3.5 pb-4">
                 <PlainCard kind="chapter" cardKey={`${eventId}:${c.eventItemId}`} />
                 <Parts chapter={c} watch={watch} />
-                <Testimony chapter={c} turns={view.turns} watch={watch} />
+                <Testimony chapter={c} turns={view.turns} watch={watch} event={event} eventId={eventId} />
                 {c.votes.length > 0 && <VoteTable votes={c.votes} />}
                 {c.startMs !== null && (
                   <details className="group" open={view.transcriptSource === "captions"}>
@@ -182,7 +193,7 @@ function MeetingView({ view, event, initialItem }: { view: View; event: NonNulla
           )}
           {shown.parts.some((p) => p.kind === "testimony") && (
             <section className={`${card} p-[18px]`} aria-label="Public testimony">
-              <Testimony chapter={shown} turns={view.turns} watch={watch} />
+              <Testimony chapter={shown} turns={view.turns} watch={watch} event={event} eventId={eventId} />
             </section>
           )}
           <section aria-labelledby="sources-heading" className="flex flex-col gap-2">
@@ -218,7 +229,7 @@ function ChapterNumber({ n, active }: { n: number; active: boolean }) {
 }
 
 
-function Testimony({ chapter, turns, watch }: { chapter: Chapter; turns: Turn[]; watch: (ms: number) => void }) {
+function Testimony({ chapter, turns, watch, event, eventId }: { chapter: Chapter; turns: Turn[]; watch: (ms: number) => void; event: Event; eventId: string }) {
   if (!chapter.parts.some((p) => p.kind === "testimony")) return null;
   const inChapter = turns.filter((t) => chapter.startMs !== null && t.startMs >= chapter.startMs && t.startMs < (chapter.endMs ?? Infinity));
   const speakers = testimonySpeakers(inChapter, chapter.parts);
@@ -241,7 +252,13 @@ function Testimony({ chapter, turns, watch }: { chapter: Chapter; turns: Turn[];
               {s.position && s.positionTurn ? (
                 <>
                   <span className="text-sm">Stated position: {s.position.position}</span>
-                  <Quote quote={s.position.quote} rawTurn={s.positionTurn.text} startMs={s.positionTurn.startMs} onWatch={watch} />
+                  <Quote
+                    quote={s.position.quote}
+                    rawTurn={s.positionTurn.text}
+                    startMs={s.positionTurn.startMs}
+                    onWatch={watch}
+                    cite={{ speaker: s.display, bodyName: event.bodyName, startsAt: event.startsAt, path: `/meetings/${eventId}?item=${chapter.eventItemId}` }}
+                  />
                 </>
               ) : (
                 <span className="text-sm text-muted">Position not stated</span>

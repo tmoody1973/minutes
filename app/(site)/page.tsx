@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { DISCLOSURE } from "../../lib/ui/shell";
 import { WeekNow } from "./_components/WeekNow";
+import { AskForm } from "./ask/AskClient";
 
-// Landing page: the pitch, then the real app (this week's cards from live records) one scroll down.
+// Landing page: Ask first (decision 008), then the real app (this week's cards from live records) one scroll down.
 // Numbers come from scripts/metrics.ts (Nov 1, 2026), same as the About page.
 const card = "rounded-[14px] border border-line bg-white p-4 md:p-5";
-const mono = "font-mono text-[11px] font-semibold tracking-[0.08em] text-muted";
 const button = "inline-flex min-h-12 items-center justify-center rounded-xl px-5 text-base font-bold no-underline";
 
 const FEATURES: { title: string; body: string; href: string; link: string }[] = [
@@ -39,24 +39,20 @@ const PROOF: [string, string][] = [
 export default function LandingPage() {
   return (
     <div className="flex flex-col gap-8 md:gap-12">
-      <section aria-labelledby="hero-heading" className="flex max-w-3xl flex-col gap-4 pt-2 md:pt-8">
-        <span className={mono}>MILWAUKEE CITY HALL, IN MINUTES</span>
-        <h1 id="hero-heading" className="text-[34px] font-extrabold leading-[1.08] tracking-[-0.015em] md:text-[56px]">
-          Know what&rsquo;s proposed near you, before it&rsquo;s decided.
-        </h1>
-        <p className="max-w-[60ch] text-[17px] leading-[1.5] md:text-xl">
-          Minutes follows Milwaukee&rsquo;s zoning and development files through the City Plan Commission, committee and Common Council,
-          turns three-hour meetings into chapters, and shows you how to be heard. Plain words, from the city&rsquo;s own records.
-        </p>
-        <div className="flex flex-wrap gap-2.5">
-          <Link href="/near" className={`${button} bg-link text-white hover:bg-ink`}>
-            See what&rsquo;s near you
-          </Link>
-          <Link href="/about" className={`${button} border-[1.5px] border-link bg-white text-link hover:bg-tint`}>
-            How it works
-          </Link>
+      <section aria-labelledby="hero-heading" className="flex max-w-3xl flex-col gap-5 pt-2 md:pt-8">
+        <div className="flex flex-col gap-3">
+          <h1 id="hero-heading" className="text-[34px] font-extrabold leading-[1.08] tracking-[-0.015em] md:text-[56px]">
+            Ask what Milwaukee City&nbsp;Hall is doing.
+          </h1>
+          <p className="max-w-[60ch] text-[17px] leading-[1.5] md:text-xl">
+            Minutes reads the files, votes and meetings of the Common Council, its committees and commissions, and answers in plain
+            words. Every sentence links to the record it came from.
+          </p>
         </div>
-        <p className="max-w-[60ch] border-l-[3px] border-link pl-3 text-[15px] font-semibold leading-snug">{DISCLOSURE}</p>
+        <AskForm />
+        <p className="max-w-[65ch] rounded-xl bg-tint px-3.5 py-2.5 text-[14px] font-semibold leading-snug">
+          {DISCLOSURE} <Link href="/about">How Minutes works</Link>
+        </p>
       </section>
 
       <section aria-labelledby="week-heading" className="flex flex-col gap-3">
@@ -69,7 +65,7 @@ export default function LandingPage() {
           </Link>
         </div>
         <Suspense fallback={<p className="text-[15px] text-muted">Loading this week…</p>}>
-          <WeekNow />
+          <WeekNow compact />
         </Suspense>
       </section>
 

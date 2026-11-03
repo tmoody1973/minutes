@@ -35,19 +35,27 @@ async function seed() {
 }
 
 describe("weekAtCityHall", () => {
-  it("zoning files on an agenda in the next 7 days and decided in the last 7, worded from the records", async () => {
+  it("files on an agenda in the next 7 days, soonest first; zoning keeps the address-led wording", async () => {
     const t = await seed();
     const w = await t.query(api.week.weekAtCityHall, { now: NOW });
-    expect(w.comingUp.map((c) => c.href)).toEqual(["/files/250001"]);
-    expect(w.comingUp[0].message).toMatch(/^100 N\. Test St\. is on the Common Council agenda for /);
-    expect(w.decided).toEqual([{ href: "/files/250002", message: expect.stringMatching(/^200 N\. Test St\.: Passed at Common Council, /), at: expect.any(String) }]);
+    expect(w.comingUp.map((c) => c.href)).toEqual(["/files/250001", "/files/250004"]);
+    expect(w.comingUp[0]).toMatchObject({ topic: "development", title: expect.stringMatching(/^100 N\. Test St\. is on the Common Council agenda for /) });
+    expect(w.comingUp[0].meta).toBeUndefined();
+    expect(w.comingUp[1]).toMatchObject({ topic: "council", title: "A resolution relating to a grant.", meta: expect.stringMatching(/^On the Common Council agenda, /) });
   });
-  it("also lists the rest of City Hall's week, outside zoning, with counts", async () => {
+  it("each file's latest decision in the last 7 days, newest first, across every body", async () => {
     const t = await seed();
-    const { also } = await t.query(api.week.weekAtCityHall, { now: NOW });
-    expect(also.comingUpCount).toBe(1);
-    expect(also.comingUp).toEqual([{ href: "/files/250004", title: "A resolution relating to a grant.", meta: expect.stringMatching(/^Common Council · /) }]);
-    expect(also.decidedCount).toBe(1);
-    expect(also.decided).toEqual([{ href: "/files/250004", title: "A resolution relating to a grant.", meta: expect.stringMatching(/^Common Council · Adopted · /) }]);
+    const w = await t.query(api.week.weekAtCityHall, { now: NOW });
+    expect(w.decided.map((c) => c.href)).toEqual(["/files/250004", "/files/250002"]);
+    expect(w.decided[0].meta).toMatch(/^Adopted at Common Council, /);
+    expect(w.decided[1]).toMatchObject({ topic: "development", title: expect.stringMatching(/^200 N\. Test St\.: Passed at Common Council, /) });
+  });
+  it("sorts a file into the topic of the committee whose agenda it is on", async () => {
+    const t = await seed();
+    await t.mutation(internal.legistar.upsertMatter, { legistarId: 6, fileNumber: "250006", title: "Class B tavern license renewal.", typeName: "Communication", statusName: "In Committee" });
+    await t.mutation(internal.legistar.upsertEvent, { legistarId: 52, bodyId: 10, bodyName: "LICENSES COMMITTEE", startsAt: day(2) });
+    await t.mutation(internal.legistar.upsertEventItem, { legistarId: 503, eventId: 52, sequence: 1, matterId: 6, fileNumber: "250006", title: "Class B tavern license renewal." });
+    const w = await t.query(api.week.weekAtCityHall, { now: NOW });
+    expect(w.comingUp[0]).toMatchObject({ href: "/files/250006", topic: "licenses", meta: expect.stringMatching(/^On the Licenses Committee agenda, /) });
   });
 });

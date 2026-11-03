@@ -9,6 +9,7 @@ import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { FollowButton } from "../../_components/FollowButton";
 import { PlainCard } from "../../_components/PlainCard";
+import { downloadCsv } from "../../../../lib/ui/csv";
 import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, tallyText } from "../../../../lib/ui/file";
 import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
@@ -284,6 +285,9 @@ function FullRecord({ view }: { view: View }) {
           </li>
         ))}
       </ul>
+      <button type="button" onClick={() => downloadHistory(view)} className="mt-1 min-h-11 text-sm font-semibold text-link underline underline-offset-[0.18em] hover:text-ink">
+        Download history (CSV)
+      </button>
       <h3 className={`${mono} mt-4`}>DOCUMENTS</h3>
       <ul className="mt-1 flex max-w-[75ch] flex-col">
         {view.attachments.map((a) => (
@@ -296,4 +300,12 @@ function FullRecord({ view }: { view: View }) {
       </ul>
     </details>
   );
+}
+
+// Every Legistar action on the file, as the full record shows it; `passed` is blank when Legistar recorded none.
+function downloadHistory(view: View) {
+  const rows = view.histories.map((h) => [
+    h.date.slice(0, 10), bodyLabel(h.bodyName), actionText([h.actionName]), h.passed === undefined ? "" : h.passed ? "yes" : "no",
+  ]);
+  downloadCsv(`file-${view.matter.fileNumber}-history.csv`, [["date", "body", "action", "passed"], ...rows]);
 }

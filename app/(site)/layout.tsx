@@ -37,6 +37,13 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
           </Suspense>
           <div className="flex basis-full items-center justify-between gap-2 md:basis-auto">
             <AddressChip />
+            <Link href="/search" className="flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-link no-underline hover:text-ink">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              Search
+            </Link>
             {/* Clerk reads the session per request: inside Suspense so the shell still prerenders (cacheComponents). */}
             <Suspense>
               <Account />

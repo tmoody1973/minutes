@@ -6,6 +6,13 @@ import { isActive, NAV, type NavIcon } from "../../../lib/ui/shell";
 
 // Icon paths copied from MinPhoneHome.dc.html; one stroke weight throughout.
 const ICONS: Record<NavIcon, React.ReactNode> = {
+  ask: (
+    <>
+      <path d="M4 5h16v11h-9l-5 4v-4H4z" />
+      <path d="M9.5 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.7-.9 1.3" />
+      <path d="M12 14.6h.01" />
+    </>
+  ),
   week: (
     <>
       <rect x="4" y="4" width="16" height="16" rx="2" />
