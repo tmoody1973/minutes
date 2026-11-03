@@ -3,6 +3,7 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
+import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { stepDate } from "../../../lib/ui/file";
 
@@ -44,6 +45,7 @@ export function FollowingClient() {
 function WatchList() {
   const follows = useQuery(api.follows.myFollows, {});
   const unfollow = useMutation(api.follows.unfollow);
+  const admin = useQuery(api.watcher.isAdmin, {});
   return (
     <section aria-labelledby="watch-heading" className={card}>
       <h2 id="watch-heading" className="mb-2 text-[17px] font-extrabold">
@@ -63,6 +65,7 @@ function WatchList() {
                 <span className="font-mono text-[11px] font-semibold tracking-[0.06em] text-muted">{KIND[f.kind].toUpperCase()} · </span>
                 {f.kind === "file" ? <Link href={`/files/${f.value}`}>{f.label}</Link> : f.label}
                 {f.kind === "topic" && f.label !== f.value && <span className="block text-[13px] text-muted">Watching for: {f.value}</span>}
+                {admin && (f.kind === "file" || f.kind === "topic") && <ReplayLatest kind={f.kind} value={f.value} />}
               </span>
               <button type="button" onClick={() => unfollow({ kind: f.kind, value: f.value })} className="min-h-11 text-sm font-semibold text-link underline underline-offset-[0.18em] hover:text-ink">
                 Stop following
@@ -72,6 +75,29 @@ function WatchList() {
         </ul>
       )}
     </section>
+  );
+}
+
+// Admin only, for demos: re-sends the newest real alert this follow would have produced, to the admin alone.
+function ReplayLatest({ kind, value }: { kind: "file" | "topic"; value: string }) {
+  const replay = useMutation(api.watcher.replayLatest);
+  const [note, setNote] = useState<string | null>(null);
+  const run = async () => {
+    setNote("Sending…");
+    try {
+      const r = await replay({ kind, value });
+      setNote(`Sent a replay of the real alert from ${stepDate(r.replayOf.slice(0, 10))}.`);
+    } catch (err) {
+      setNote(err instanceof Error ? err.message.replace(/^.*Uncaught Error: /, "").split("\n")[0] : "That didn't work. Try again.");
+    }
+  };
+  return (
+    <span className="block">
+      <button type="button" onClick={run} className="min-h-11 text-[13px] font-semibold text-amber-fg underline underline-offset-[0.18em]">
+        Replay the latest real alert to me
+      </button>
+      {note && <span role="status" className="block text-[13px] text-muted">{note}</span>}
+    </span>
   );
 }
 
