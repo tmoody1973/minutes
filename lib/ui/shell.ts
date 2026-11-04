@@ -1,7 +1,7 @@
 // App shell data shared by the phone bottom nav and the laptop header (mockups MinPhoneHome, MinLaptopTracker).
 
-// Spec decision "Disclosure": verbatim on every project and meeting screen, the About page and the README.
-export const DISCLOSURE = "Built by Tarik Moody, a sitting member of the City Plan Commission. Public records only, no recommendations.";
+// Builder line on every page, the About page, alert emails and the README (Tarik, Nov 4: no commission mention).
+export const DISCLOSURE = "Built by Tarik Moody. Public records only, no recommendations.";
 
 export type NavIcon = "ask" | "week" | "pin" | "video" | "bookmark";
 

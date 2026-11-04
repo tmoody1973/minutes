@@ -2,7 +2,7 @@
 
 > Milwaukee City Hall, in minutes.
 
-**Built by Tarik Moody, a sitting member of the City Plan Commission. Public records only, no recommendations.**
+**Built by Tarik Moody. Public records only, no recommendations.**
 
 Entry for the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/global-hackathon) · Indie developer track · Theme: Build for Your World · Built Oct 29 – Nov 4, 2026.
 
@@ -19,10 +19,10 @@ Minutes reads the records of the Common Council, its eight standing committees a
 
 | Feature | What you get |
 |---|---|
-| **Ask Minutes** | Type a question ("What has the city done about police surveillance cameras?"). Muse Spark looks things up in the synced records and answers in two to five plain sentences. Every sentence shows the files it came from, and a box explains the city's procedural terms ("held to call of the chair"). Sentences the records don't support are dropped before you see them. |
+| **Ask Minutes** | Type a question ("What has the city done about police surveillance cameras?"). Muse Spark looks things up in the synced records, including the text of the PDFs attached to files (staff reports, police policies, contracts), and answers in two to five plain sentences. Every sentence shows the files it came from, and a box explains the city's procedural terms ("held to call of the chair"). Sentences the records don't support are dropped before you see them. |
 | **Follow this** | Under every answer, Minutes proposes a few words to watch for in new file titles. Edit them, sign in, follow. Minutes emails you only when a matching file is introduced, put on an agenda or decided. Introduction comes first, usually weeks before a hearing, which is when there is still time to organize. Only the name and the words are saved, never the question. |
-| **File pages** | One file's path from introduction to the Mayor: every real step with its vote, a jump into the meeting video, the next hearing with an add-to-calendar file, and for zoning files the lot outline and what the zoning would change. |
-| **Meetings** | Every synced meeting, with its agenda and what was decided: each item's actions and vote count, who moved it, the clerk's note from the minutes, and a jump into the city's video. Eight meetings are also split into chapters with a transcript: four transcribed with speaker names, four from the city's own captions. |
+| **File pages** | One file's path from introduction to the Mayor: every real step with its vote, a jump into the meeting video, the next hearing with an add-to-calendar file, **who decides** (each member, and for the Council each alder's district, email and city page) and **how to be heard** in that body's own published words, and for zoning files the lot outline and what the zoning would change. |
+| **Meetings** | Every synced meeting, with its agenda and what was decided: each item's actions and vote count, who moved it, the clerk's note from the minutes, and a jump into the city's video. Coming-up meetings also show how to be heard and who decides. Meetings are split into chapters with a transcript wherever one exists: four transcribed with speaker names, the rest from the city's own captions. |
 | **This week** | Files on an agenda in the next seven days and decisions from the last seven, sorted by topic. |
 | **Near me** | Type an address, see zoning and development files within half a mile. The address is used for the lookup and never stored. |
 | **Search** | Files and words said in meetings. |
@@ -33,7 +33,7 @@ Minutes reads the records of the Common Council, its eight standing committees a
 
 | Model | Used for |
 |---|---|
-| **Muse Spark** (`muse-spark-1.3`), as the **Ask agent** | Answers questions with four tools over the synced records: `find_files`, `read_file` (steps, votes, upcoming agendas), `find_moments` (words said in meetings) and `upcoming`. It also proposes the watch words for Follow this. Up to four lookup rounds, then a JSON answer with each sentence's record keys. |
+| **Muse Spark** (`muse-spark-1.3`), as the **Ask agent** | Answers questions with four tools over the synced records: `find_files`, `read_file` (steps, votes, upcoming agendas), `find_moments` (words said in meetings), `find_in_documents` (passages from files' attached PDFs) and `upcoming`. It also proposes the watch words for Follow this. Up to four lookup rounds, then a JSON answer with each sentence's record keys. |
 | **Muse Spark**, as the **Editor** | Sees one sentence and only the records it cites, and rejects anything they don't state or any word that takes a side. Code runs first (no source, unknown source, judging-word list), then the model check. A sentence sent back for wording gets one rewrite, which is checked again. ([decision 007](docs/decisions/007-plain-language-cards-written-ahead-checked-sentence-by-sentence.md)) |
 | **Muse Spark**, as the **Clerk writer** | One or two plain sentences per file and per meeting chapter, written ahead and saved only when the Editor approves every one (188 cards). |
 | **Muse Spark**, as a **check on speaker names** | Confirm-only: it can reject a proposed name, never invent one ([decision 004](docs/decisions/004-muse-spark-confirms-speaker-names-never-proposes.md)). It also splits a hearing into presentation, testimony, discussion and vote. |
@@ -44,10 +44,10 @@ Voice questions in English and Spanish were planned and cut for time.
 
 ## How it stays neutral
 
-The builder sits on the City Plan Commission, which is part of the demo. Neutrality comes from how the product is built, not from leaving the commission out:
+Neutrality comes from how the product is built:
 
 - **Records, not opinions.** Every sentence traces to a stored public record: a Legistar history row, a vote, a document, or a timestamped transcript turn.
-- **Same treatment for everyone.** The builder's votes and statements render exactly like every other member's; a test proves the vote table's rows are identical in markup.
+- **Same treatment for everyone.** Every member's votes and statements render exactly alike; a test proves the vote table's rows are identical in markup.
 - **Positions only in people's own words.** A public speaker is shown as "for" or "against" only when they say so plainly, with that sentence quoted beside it. Otherwise: "Position not stated." ([decision 005](docs/decisions/005-testimony-and-positions-only-from-own-words.md))
 - **No guessed speakers.** Names come from the roll call and agenda, or a self-introduction marked "name as heard". Anyone else is "Speaker B".
 - **Quotes are lightly cleaned only.** The only edit is removing immediately repeated words; every quote links to the raw text and the video moment.
@@ -60,14 +60,16 @@ The builder sits on the City Plan Commission, which is part of the demo. Neutral
 | What | Result | Source |
 |---|---|---|
 | Records synced | Legistar every 30 minutes plus nightly; 1,817 files in the dev database on Nov 3 | `scripts/metrics.ts` |
+| A real alert | File 260809 (license plate reader contracts) passed the Common Council at its 9 AM meeting on Nov 4; the follower's email arrived at 11:34 AM, from the city's own record of the vote | Resend email |
+| Documents Ask can read | 1,549 PDFs attached to files active since Sep 1 on production; 1,324 with text, 225 scans with none (stored empty, not guessed at); about 30,000 passages | `scripts/ingest-docs.ts` |
 | Meetings transcribed | 4 (Sep 28 Plan Commission, Oct 6 and Oct 27 ZND committee, Oct 13 Common Council), 8.44 hours, 53 chunks, 0 failures | `DEVLOG.md` |
-| Meetings with chapters | 8 of about 210 synced meetings: 4 with Muse Voice Transcribe transcripts, 4 from city captions (Fire & Police, Public Safety & Health, Judiciary & Legislation, Historic Preservation); every other meeting shows its agenda and outcomes from the records | `DEVLOG.md` |
+| Meetings with chapters | Being added on Nov 4 (final count at submission): 4 with Muse Voice Transcribe transcripts, the rest from the city's captions (0 model calls). Skipped: meetings with no posted video or empty captions, and those over 7,500 caption lines; those show their agenda and outcomes from the records | `scripts/ingest-captions-all.ts` |
 | Transcription cost | $1.52 total, about $0.18 per hour | `DEVLOG.md` |
 | Editor trap test | 8 of 8 planted errors caught (wrong count, wrong date, invented reason, prediction, judging word, unsupported claim); both correct sentences passed | `scripts/editor-eval.ts` |
 | Editor in use | 5 of 378 written sentences rejected (1.3%), for example "…sold to Vliet Street Lofts, LLC": the records authorize accepting an offer, not a completed sale | `scripts/metrics.ts` |
 | Ask reliability | Each home page example asked 3 times on production; all 9 answered with cited sentences | `DEVLOG.md` |
 | Speaker naming | 3.9% of transcript turns named; the rest show as "Speaker B" until reviewed | `scripts/metrics.ts` |
-| Tests | 701 passing (Vitest, including Convex function tests) | `npm test` |
+| Tests | 725 passing (Vitest, including Convex function tests) | `npm test` |
 
 ## What was built during the hackathon
 
@@ -85,6 +87,7 @@ Everything in this repository was written between Oct 29 and Nov 4, 2026, during
   8. All of City Hall and Ask Minutes ([decision 008](docs/decisions/008-all-of-city-hall-ask-first.md), PR #17)
   9. Ask reliability, honest votes, Follow this, plain answers and the action-terms box, demo replay, all-of-City-Hall copy (PRs #18–#24)
   10. Every meeting listed with its agenda and the minutes' own words, video beside the content, chapters from city captions (PRs #26–#27)
+  11. Alerts when a file is introduced, who decides and alder contacts, how to be heard, Ask reading attached PDFs, caption chapters for every meeting with captions (PR #29)
 
 **Built with [Claude Code](https://claude.com/claude-code)** (Anthropic's coding agent), which wrote the code under the builder's direction; commits are co-authored accordingly. Meta's models run inside the product, as described above.
 
@@ -130,6 +133,8 @@ npx tsx scripts/ask.ts "Where is the 2027 city budget in the process?"
 | `ADMIN_USER_IDS` | Convex env: Clerk user ids allowed to replay a real past alert to themselves | Demos |
 
 **Meetings:** meeting audio and transcripts are not in the repository (`data/` is ignored). To make a meeting readable: download its audio (see [decision 001](docs/decisions/001-meeting-audio-via-browser-download.md)), transcribe it with `scripts/phase1/transcribe_meeting.py`, then run `npx tsx scripts/ingest-meeting.ts <eventId>`. If there is no local transcript, `--captions` lets the city's machine captions stand in, labeled as such on the page.
+
+**Documents and captions in bulk:** `npx tsx scripts/ingest-docs.ts` stores the text of PDFs attached to active files (needs `pdftotext` from poppler; no model calls). `npx tsx scripts/ingest-captions-all.ts` turns the city's captions into chapters for every past meeting that has them (no model calls).
 
 **Speaker review:** `npx tsx scripts/speakers.ts list <eventId>` shows each voice with its agenda item and a video link; `set`, `hide` and `clear` correct names without re-ingesting.
 

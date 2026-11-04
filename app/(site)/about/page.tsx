@@ -76,9 +76,8 @@ export default function AboutPage() {
         </h2>
         <p className="mt-1.5 text-[17px] font-bold leading-snug">{DISCLOSURE}</p>
         <p className="mt-2 max-w-[65ch] text-[15px] leading-normal">
-          The Plan Commission is part of what Minutes covers, so neutrality is built into the product: it shows records, never
-          recommendations. My votes and statements appear exactly like every other member&rsquo;s, and I won&rsquo;t use Minutes to
-          comment on items pending before the commission.
+          Neutrality is built into the product: Minutes shows records, never recommendations, and every member&rsquo;s votes and
+          statements appear exactly the same way.
         </p>
       </section>
 

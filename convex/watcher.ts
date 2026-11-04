@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { DISCLOSURE } from "../lib/ui/shell";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, internalAction, internalMutation, internalQuery, mutation, type MutationCtx, query } from "./_generated/server";
@@ -10,7 +11,6 @@ import { requireUser } from "./follows";
 const BATCH = 500;
 const MAX_ROUNDS = 20;
 const FROM = "Minutes <onboarding@resend.dev>"; // Resend's test sender until a domain is verified (Tarik, 2026-10-30)
-const DISCLOSURE = "Built by Tarik Moody, a sitting member of the City Plan Commission. Public records only, no recommendations.";
 
 type Matter = MatterContext & { matterId: number };
 
