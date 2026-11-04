@@ -20,16 +20,23 @@ type Target = { hyperlink: string; name: string; matterId: number; fileNumber: s
 type Doc = Target & { passages: string[] };
 
 const dir = mkdtempSync(join(tmpdir(), "minutes-docs-"));
+// Why downloads failed ("timeout", "ECONNRESET", "HTTP 503"), printed at the end.
+const reasons = new Map<string, number>();
+const failedBecause = (why: string) => {
+  reasons.set(why, (reasons.get(why) ?? 0) + 1);
+  return null;
+};
 
 async function textOf(t: Target, i: number): Promise<string[] | null> {
-  let res: Response;
+  let bytes: Buffer;
   try {
-    res = await fetch(t.hyperlink, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60_000) });
-  } catch {
-    return null; // network: try again next run
+    const res = await fetch(t.hyperlink, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60_000) });
+    if (res.status !== 200) return failedBecause(`HTTP ${res.status}`);
+    bytes = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    const err = e as Error & { cause?: { code?: string } };
+    return failedBecause(err.name === "TimeoutError" ? "timeout" : (err.cause?.code ?? err.message)); // try again next run
   }
-  if (res.status !== 200) return null;
-  const bytes = Buffer.from(await res.arrayBuffer());
   if (bytes.length > MAX_PDF_BYTES || bytes.subarray(0, 4).toString() !== "%PDF") return [];
   const file = join(dir, `${i}.pdf`);
   writeFileSync(file, bytes);
@@ -62,29 +69,35 @@ async function main() {
     pending = [];
     pendingBytes = 0;
   };
+  const failed: Target[] = [];
+  const take = async (t: Target, i: number) => {
+    const passages = await textOf(t, i);
+    if (passages === null) return void failed.push(t);
+    if (passages.length) tally.withText++;
+    else tally.empty++;
+    tally.passages += passages.length;
+    pending.push({ ...t, passages });
+    pendingBytes += passages.reduce((n, p) => n + p.length, 0);
+    if (pendingBytes >= SAVE_BYTES) flush();
+  };
   let next = 0;
   const worker = async () => {
     while (next < todo.length) {
       const i = next++;
-      const t = todo[i];
-      const passages = await textOf(t, i);
-      if (passages === null) {
-        tally.failed++;
-        continue;
-      }
-      if (passages.length) tally.withText++;
-      else tally.empty++;
-      tally.passages += passages.length;
-      pending.push({ ...t, passages });
-      pendingBytes += passages.reduce((n, p) => n + p.length, 0);
-      if (pendingBytes >= SAVE_BYTES) flush();
-      if ((i + 1) % 100 === 0) console.log(`${i + 1}/${todo.length} ${JSON.stringify(tally)}`);
+      await take(todo[i], i);
+      if ((i + 1) % 100 === 0) console.log(`${i + 1}/${todo.length} ${JSON.stringify({ ...tally, failed: failed.length })}`);
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  // A save blocks the process, so a download in flight during a slow one can time out. Retry those one at a time.
+  if (failed.length) {
+    console.log(`retrying ${failed.length} failed downloads one at a time; first pass: ${JSON.stringify([...reasons])}`);
+    reasons.clear();
+    for (const [i, t] of failed.splice(0).entries()) await take(t, todo.length + i);
+  }
   flush();
   rmSync(dir, { recursive: true, force: true });
-  console.log(JSON.stringify(tally));
+  console.log(JSON.stringify({ ...tally, failed: failed.length }), failed.length ? JSON.stringify([...reasons]) : "");
 }
 
 main().catch((e) => {

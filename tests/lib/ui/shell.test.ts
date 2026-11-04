@@ -31,5 +31,5 @@ describe("weekOf (America/Chicago, weeks start Monday)", () => {
 });
 
 it("disclosure matches the spec line verbatim", () => {
-  expect(DISCLOSURE).toBe("Built by Tarik Moody, a sitting member of the City Plan Commission. Public records only, no recommendations.");
+  expect(DISCLOSURE).toBe("Built by Tarik Moody. Public records only, no recommendations.");
 });
