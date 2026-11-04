@@ -4,10 +4,10 @@
 
 **Built by Tarik Moody. Public records only, no recommendations.**
 
-Entry for the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/global-hackathon) · Indie developer track · Theme: Build for Your World · Built Oct 29 – Nov 4, 2026.
+Built Oct 29 – Nov 4, 2026, during the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/global-hackathon).
 
 - **Live app:** https://minutes-rust.vercel.app
-- **Demo video:** _added before submission_
+- **Video:** _coming soon_
 
 ---
 
@@ -63,7 +63,7 @@ Neutrality comes from how the product is built:
 | A real alert | File 260809 (license plate reader contracts) passed the Common Council at its 9 AM meeting on Nov 4; the follower's email arrived at 11:34 AM, from the city's own record of the vote | Resend email |
 | Documents Ask can read | 1,549 PDFs attached to files active since Sep 1 on production; 1,324 with text, 225 scans with none (stored empty, not guessed at); about 30,000 passages | `scripts/ingest-docs.ts` |
 | Meetings transcribed | 4 (Sep 28 Plan Commission, Oct 6 and Oct 27 ZND committee, Oct 13 Common Council), 8.44 hours, 53 chunks, 0 failures | `DEVLOG.md` |
-| Meetings with chapters | Being added on Nov 4 (final count at submission): 4 with Muse Voice Transcribe transcripts, the rest from the city's captions (0 model calls). Skipped: meetings with no posted video or empty captions, and those over 7,500 caption lines; those show their agenda and outcomes from the records | `scripts/ingest-captions-all.ts` |
+| Meetings with chapters | 148 on production (Nov 4): 4 with Muse Voice Transcribe transcripts, 144 from the city's captions (0 model calls). Without chapters: 33 with no posted video, 6 with empty captions, 21 over 7,500 caption lines; those show their agenda and outcomes from the records | `scripts/ingest-captions-all.ts` |
 | Transcription cost | $1.52 total, about $0.18 per hour | `DEVLOG.md` |
 | Editor trap test | 8 of 8 planted errors caught (wrong count, wrong date, invented reason, prediction, judging word, unsupported claim); both correct sentences passed | `scripts/editor-eval.ts` |
 | Editor in use | 5 of 378 written sentences rejected (1.3%), for example "…sold to Vliet Street Lofts, LLC": the records authorize accepting an offer, not a completed sale | `scripts/metrics.ts` |
