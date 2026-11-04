@@ -23,7 +23,7 @@ export function FollowingClient() {
   if (!isAuthenticated) {
     return (
       <div className={`${card} flex max-w-xl flex-col gap-3`}>
-        <p className="text-[15px]">Sign in to follow a concern, a file, your area or your alderperson. Minutes tells you only when a hearing is scheduled or a decision is made.</p>
+        <p className="text-[15px]">Sign in to follow a concern, a file, your area or your alderperson. Minutes tells you only when a new file is introduced, a hearing is scheduled or a decision is made.</p>
         <SignInButton mode="modal">
           <button type="button" className="min-h-12 self-start rounded-xl bg-link px-5 text-base font-bold text-white hover:bg-ink">
             Sign in

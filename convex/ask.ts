@@ -4,7 +4,7 @@ import { fileSources } from "./editor";
 import { expandAddress, withWordForms } from "../lib/search/query";
 import { label } from "../lib/timeline/build";
 import { TOPICS, topicOfFile } from "../lib/topics";
-import { actionText, stepDate } from "../lib/ui/file";
+import { actionText, stepDate, isFileNumber } from "../lib/ui/file";
 import { clock } from "../lib/ui/meeting";
 
 // Ask Minutes' lookups (decision 008). Each returns records keyed like the Editor's sources, so an answer sentence can
@@ -18,8 +18,8 @@ export const findFiles = query({
   handler: async (ctx, { q }): Promise<Rec[]> => {
     const text = q.trim().slice(0, 100);
     if (text.length < 2) return [];
-    const exact = /^\d{5,7}$/.test(text)
-      ? await ctx.db.query("matters").withIndex("by_fileNumber", (x) => x.eq("fileNumber", text)).first()
+    const exact = isFileNumber(text)
+      ? await ctx.db.query("matters").withIndex("by_fileNumber", (x) => x.eq("fileNumber", text.toUpperCase())).first()
       : null;
     const titled = await ctx.db.query("matters").withSearchIndex("search_title", (x) => x.search("title", withWordForms(expandAddress(text)))).take(MAX);
     const matters = [...(exact ? [exact] : []), ...titled.filter((m) => m._id !== exact?._id)].slice(0, MAX);
@@ -91,6 +91,22 @@ export const findMoments = query({
       });
     }
     return out;
+  },
+});
+
+// Words inside files' attached documents (staff reports, fiscal notes, contracts), as synced by scripts/ingest-docs.ts.
+export const findInDocuments = query({
+  args: { q: v.string() },
+  handler: async (ctx, { q }): Promise<Rec[]> => {
+    const text = q.trim().slice(0, 100);
+    if (text.length < 2) return [];
+    const hits = await ctx.db.query("docPassages").withSearchIndex("search_text", (x) => x.search("text", text)).take(MAX);
+    return hits.map((p) => ({
+      key: `doc:${p._id}`,
+      label: `${p.name}, file ${p.fileNumber}`,
+      text: `From "${p.name}", attached to file ${p.fileNumber}: ${p.text}`,
+      href: `/files/${p.fileNumber}`,
+    }));
   },
 });
 

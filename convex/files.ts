@@ -1,16 +1,16 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { buildTimeline } from "../lib/timeline/build";
+import { isFileNumber } from "../lib/ui/file";
 import type { Tally, TimelineStep } from "../lib/types";
 
-const FILE_NUMBER = /^\d{5,7}$/;
 
 // Public, read-only: everything the project page shows for one Legistar file. The lot owner's name is dropped:
 // the page has no use for it and a private person's name should not ride along to every visitor.
 export const fileView = query({
   args: { fileNumber: v.string() },
   handler: async (ctx, { fileNumber }) => {
-    if (!FILE_NUMBER.test(fileNumber)) throw new Error("file number must be 5 to 7 digits");
+    if (!isFileNumber(fileNumber)) throw new Error("file number must be 5 to 7 digits, or FPC and digits");
     const m = await ctx.db.query("matters").withIndex("by_fileNumber", (q) => q.eq("fileNumber", fileNumber)).first();
     if (!m) return null;
     const histories = await ctx.db.query("histories").withIndex("by_matter", (q) => q.eq("matterId", m.legistarId)).collect();

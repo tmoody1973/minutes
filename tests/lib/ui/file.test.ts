@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionText, commentPage, COMMENT_PAGES, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../lib/ui/file";
+import { actionText, commentPage, COMMENT_PAGES, hearingIcs, isFileNumber, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../lib/ui/file";
 
 const BOOKENDS =
   "A substitute ordinance relating to the change in zoning from General Planned Development known as Bookends to a Detailed Planned Development known as Zenith to allow the construction of a multi-family residential building at 711 East Kilbourn Avenue and 822 North Van Buren Street, on the east side of North Van Buren Street, south of East Kilbourn Avenue, in the 4th Aldermanic District.";
@@ -22,6 +22,13 @@ describe("actionText repeats", () => {
     expect(actionText(["AMENDED", "AMENDED", "AMENDED (WITHDRAWN)", "AMENDED", "REFERRED WITHOUT RECOMMENDATION"])).toBe(
       "Amended, 3 times; Amended (withdrawn); Referred without recommendation",
     ));
+});
+
+describe("isFileNumber", () => {
+  it("City Hall files are 5 to 7 digits; Fire and Police Commission files carry FPC", () => {
+    for (const ok of ["260809", "FPC212700", "fpc212700"]) expect(isFileNumber(ok)).toBe(true);
+    for (const bad of ["2608", "FPC", "ABC212700", "260809x", ""]) expect(isFileNumber(bad)).toBe(false);
+  });
 });
 
 describe("subjectOf", () => {

@@ -8,9 +8,11 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { granicusLink } from "../../../../lib/media/review";
 import { FollowButton } from "../../_components/FollowButton";
+import { beHeard } from "../../../../lib/ui/takePart";
+import { AlderFor, HowToBeHeard as BeHeardLines, WhoDecides } from "../../_components/WhoDecides";
 import { PlainCard } from "../../_components/PlainCard";
 import { downloadCsv } from "../../../../lib/ui/csv";
-import { actionText, commentPage, hearingIcs, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../../lib/ui/file";
+import { actionText, commentPage, hearingIcs, isFileNumber, outlineSvg, purposeLine, sourceDocs, stepDate, subjectOf, tallyText } from "../../../../lib/ui/file";
 import { bodyLabel, kindLabel, placeHeading } from "../../../../lib/ui/near";
 import { lookup } from "../../../../lib/zoning/glossary";
 import { parseZoningChange } from "../../../../lib/zoning/change";
@@ -18,13 +20,13 @@ import { parseZoningChange } from "../../../../lib/zoning/change";
 type View = NonNullable<FunctionReturnType<typeof api.files.fileView>>;
 type Step = View["timeline"][number];
 
-const FILE_NUMBER = /^\d{5,7}$/;
 const card = "rounded-[14px] border border-line bg-white";
 const mono = "font-mono text-[11px] font-semibold tracking-[0.08em] text-muted";
 
 export function FileClient() {
-  const { file } = useParams<{ file: string }>();
-  const valid = FILE_NUMBER.test(file);
+  const { file: raw } = useParams<{ file: string }>();
+  const file = raw.toUpperCase();
+  const valid = isFileNumber(file);
   const view = useQuery(api.files.fileView, valid ? { fileNumber: file } : "skip");
 
   if (valid && view === undefined) return <p className="text-[15px] text-muted" aria-live="polite">Loading file {file}…</p>;
@@ -33,7 +35,7 @@ export function FileClient() {
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px] font-extrabold md:text-[32px]">We don&apos;t have that file</h1>
         <p className="max-w-[65ch] text-base text-muted">
-          Minutes follows zoning files from Plan Commission to Council. <Link href="/near">Find development near you</Link>.
+          Minutes follows the files of the Common Council, its committees and the City Plan, Fire &amp; Police and Historic Preservation commissions. <Link href="/near">Find development near you</Link>.
         </p>
       </div>
     );
@@ -79,6 +81,7 @@ function FileView({ view }: { view: View }) {
           {heading}
         </h1>
         <PlainCard kind="file" cardKey={matter.fileNumber} fallback={purpose && <p className="max-w-[65ch] text-[17px] leading-[1.45]">{purpose}</p>} />
+        {districts.length === 1 && <AlderFor district={districts[0]} />}
         <div>
           <FollowButton kind="file" value={matter.fileNumber} label={heading} text="Follow this file" />
         </div>
@@ -228,11 +231,13 @@ function HowToBeHeard({
     <section id="next-hearing" aria-labelledby="hearing-heading" className={`${card} flex scroll-mt-4 flex-col gap-3 p-4`}>
       {/* The heading promises instructions only when a confirmed city page backs it. */}
       <h2 id="hearing-heading" className="text-[17px] font-extrabold">
-        {page ? "How to be heard" : "Next hearing"}
+        {page || beHeard(next.body) ? "How to be heard" : "Next hearing"}
       </h2>
       <p className="text-[15px]">
         {next.body} takes this up on <span className="font-bold text-amber-fg">{stepDate(next.date, next.startsAt)}</span>.
       </p>
+      <BeHeardLines body={next.body} titled={false} />
+      <WhoDecides eventId={next.eventId} />
       {page && (
         <a href={page.url} className="flex min-h-12 items-center justify-center rounded-xl bg-link px-4 text-base font-bold text-white no-underline hover:bg-ink hover:text-white">
           How to take part, from the city

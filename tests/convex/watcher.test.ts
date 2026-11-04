@@ -80,6 +80,16 @@ describe("Watcher", () => {
     await t.withIdentity(ann).mutation(api.follows.unfollow, { kind: "topic", value: "flock, van buren streets" });
     expect(await t.withIdentity(ann).query(api.follows.myFollows, {})).toEqual([]);
   });
+  it("a concern hears about a matching file when it is introduced, before any agenda", async () => {
+    const t = await bookends();
+    await t.withIdentity(ann).mutation(api.follows.follow, { kind: "topic", value: "van buren", label: "Van Buren" });
+    await t.mutation(internal.legistar.upsertHistory, { legistarId: 7001, matterId: 74560, date: "2026-11-05T00:00:00", bodyName: "COMMON COUNCIL", actionName: "ASSIGNED TO" });
+    await t.mutation(internal.legistar.upsertHistory, { legistarId: 7002, matterId: 74560, date: "2026-11-05T00:00:00", bodyName: "CITY CLERK", actionName: "PUBLISHED" });
+    await t.action(internal.watcher.runWatcher, {});
+    const inbox = await alertsOf(t, ann);
+    expect(inbox).toHaveLength(1);
+    expect(inbox[0].message).toMatch(/^New file: 711 E\. Kilbourn Ave\. and 822 N\. Van Buren St\.: Assigned at Common Council, Nov 5, 2026\./);
+  });
   it("an address follow matches a lot within half a mile", async () => {
     const t = await bookends();
     await t.withIdentity(ann).mutation(api.follows.follow, { kind: "address", value: "43.0430,-87.9000", label: "Near home" });

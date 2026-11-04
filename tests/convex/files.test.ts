@@ -55,6 +55,11 @@ describe("fileView", () => {
     expect(JSON.stringify(v)).not.toContain("PRIVATE OWNER");
   });
 
+  it("a Fire and Police Commission file (FPC number) has a page too", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.legistar.upsertMatter, { legistarId: 77, fileNumber: "FPC212700", title: "Communication from the Milwaukee Police Department relating to automated license plate readers.", typeName: "Communication", statusName: "Placed On File" });
+    expect((await t.query(api.files.fileView, { fileNumber: "FPC212700" }))?.matter.fileNumber).toBe("FPC212700");
+  });
   it("null for an unknown file; rejects a malformed file number", async () => {
     const t = await seed();
     expect(await t.query(api.files.fileView, { fileNumber: "999999" })).toBeNull();

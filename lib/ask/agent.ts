@@ -9,6 +9,7 @@ export type Tools = {
   find_files: (query: string) => Promise<Rec[]>;
   read_file: (fileNumber: string) => Promise<Rec[]>;
   find_moments: (query: string) => Promise<Rec[]>;
+  find_in_documents: (query: string) => Promise<Rec[]>;
   upcoming: (days: number) => Promise<Rec[]>;
 };
 // follow: Muse's proposal for Follow this, words a later file on the same subject would have in its title. Shown for
@@ -21,9 +22,11 @@ type Opts = { chat?: Chat; verify?: Verify; onStep?: (text: string) => void; max
 const MAX_ROUNDS = 4;
 const MAX_CALLS = 6;
 const MAX_RECORDS_SHOWN = 8;
+// What the model reads of each record. A document passage (600 characters plus its source line) fits whole.
+const RECORD_CHARS_SHOWN = 700;
 
 const SYSTEM = `You are Ask Minutes. You answer questions about Milwaukee City Hall (the Common Council, its committees, and the City Plan, Fire & Police and Historic Preservation commissions) using only the records your tools return.
-Look first. find_files finds files by subject words or file number. read_file gives a file's full record: its steps, votes and upcoming agenda dates. find_moments finds words said in meetings. upcoming lists agenda items for the next days.
+Look first. find_files finds files by subject words or file number. read_file gives a file's full record: its steps, votes and upcoming agenda dates. find_moments finds words said in meetings. find_in_documents finds words inside the documents attached to files (staff reports, fiscal notes, contracts): use it for what a file would do, cost or require. upcoming lists agenda items for the next days.
 Search with short subject words (two to four), and try a few phrasings at once. Read the most relevant files before answering.
 When the question is about a time ("this week", "this month", "coming up", "next"), also call upcoming, and read the newest matching files.
 Rules for the answer:
@@ -44,6 +47,7 @@ const TOOL_SPECS: ToolSpec[] = [
   { type: "function", function: { name: "find_files", description: "Find City Hall files by subject words or a file number.", parameters: { type: "object", properties: { query: str }, required: ["query"] } } },
   { type: "function", function: { name: "read_file", description: "Every record of one file: steps through committees and Council, votes, upcoming agenda dates.", parameters: { type: "object", properties: { file_number: str }, required: ["file_number"] } } },
   { type: "function", function: { name: "find_moments", description: "Find words said in recorded meetings.", parameters: { type: "object", properties: { query: str }, required: ["query"] } } },
+  { type: "function", function: { name: "find_in_documents", description: "Find words inside files' attached documents: staff reports, fiscal notes, contracts.", parameters: { type: "object", properties: { query: str }, required: ["query"] } } },
   { type: "function", function: { name: "upcoming", description: "Agenda items for meetings in the next days (1 to 14).", parameters: { type: "object", properties: { days: { type: "number" } }, required: ["days"] } } },
 ];
 
@@ -52,6 +56,7 @@ function stepText(name: string, a: Record<string, unknown>): string {
   if (name === "find_files") return `Searching files for "${String(a.query ?? "")}"`;
   if (name === "read_file") return `Reading file ${String(a.file_number ?? "")}`;
   if (name === "find_moments") return `Searching what was said in meetings for "${String(a.query ?? "")}"`;
+  if (name === "find_in_documents") return `Searching the files' documents for "${String(a.query ?? "")}"`;
   return `Checking agendas for the next ${Number(a.days) || 7} days`;
 }
 
@@ -59,6 +64,7 @@ async function runTool(tools: Tools, name: string, a: Record<string, unknown>): 
   if (name === "find_files") return tools.find_files(String(a.query ?? ""));
   if (name === "read_file") return tools.read_file(String(a.file_number ?? ""));
   if (name === "find_moments") return tools.find_moments(String(a.query ?? ""));
+  if (name === "find_in_documents") return tools.find_in_documents(String(a.query ?? ""));
   if (name === "upcoming") return tools.upcoming(Number(a.days) || 7);
   return [];
 }
@@ -113,7 +119,7 @@ export async function runAgent(question: string, tools: Tools, opts: Opts = {}):
     const results = await Promise.all(calls.map(({ call, args }) => runTool(tools, call.function.name, args)));
     calls.forEach(({ call }, i) => {
       for (const r of results[i]) found.set(r.key, r);
-      const content = results[i].length ? results[i].map((r) => `[${r.key}] ${r.text.slice(0, 500)}`).join("\n") : "No records found.";
+      const content = results[i].length ? results[i].map((r) => `[${r.key}] ${r.text.slice(0, RECORD_CHARS_SHOWN)}`).join("\n") : "No records found.";
       messages.push({ role: "tool", tool_call_id: call.id, content });
     });
     // Calls past the cap still need an answer, or the model's next turn is rejected.

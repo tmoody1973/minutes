@@ -21,6 +21,9 @@ export function tallyText(t: Tally): string {
   return [`Vote ${t.aye}–${t.no}`, ...extra].join(", ");
 }
 
+/** City Hall file numbers: 5 to 7 digits, or the Fire and Police Commission's "FPC" and digits (FPC212700). */
+export const isFileNumber = (s: string) => /^(?:FPC)?\d{5,7}$/i.test(s);
+
 const SUBJECT_MAX = 90;
 // A file with no address (most of City Hall) is named by its title's own words after "relating to", cut at a word.
 export function subjectOf(title: string): string | null {

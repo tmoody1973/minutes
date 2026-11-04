@@ -24,7 +24,7 @@ const FEATURES: { title: string; body: string; href: string; link: string }[] = 
   },
   {
     title: "Hear about it only when it matters",
-    body: "Ask about anything, then follow it. Or follow a file, your area or your alderperson. Minutes emails you when a hearing is set or a decision is made, and stays quiet otherwise.",
+    body: "Ask about anything, then follow it. Or follow a file, your area or your alderperson. Minutes emails you when a file is introduced, a hearing is set or a decision is made, and stays quiet otherwise.",
     href: "/ask",
     link: "Ask, then follow",
   },

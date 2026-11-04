@@ -92,6 +92,15 @@ describe("change log", () => {
     const kinds = Object.fromEntries((await changes(t)).map((c) => [c.sourceKey, c.kind]));
     expect(kinds).toEqual({ "history:1": "decision", "history:2": "step_added" });
   });
+  it("a file sent to a committee (assigned or referred, no vote) is recorded as introduced", async () => {
+    const t = convexTest(schema, modules);
+    const { passed: _p, ...noPass } = history;
+    await t.mutation(internal.legistar.upsertHistory, { ...noPass, legistarId: 3, bodyName: "COMMON COUNCIL", actionName: "ASSIGNED TO" });
+    await t.mutation(internal.legistar.upsertHistory, { ...noPass, legistarId: 4, bodyName: "FIRE AND POLICE COMMISSION", actionName: "REFERRED  TO" });
+    await t.mutation(internal.legistar.upsertHistory, { ...noPass, legistarId: 5, bodyName: "CITY CLERK", actionName: "PUBLISHED" });
+    const kinds = Object.fromEntries((await changes(t)).map((c) => [c.sourceKey, c.kind]));
+    expect(kinds).toEqual({ "history:3": "introduced", "history:4": "introduced", "history:5": "step_added" });
+  });
 
   it("editing an existing history row writes no new change", async () => {
     const t = convexTest(schema, modules);

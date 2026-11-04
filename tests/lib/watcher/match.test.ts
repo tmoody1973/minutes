@@ -49,6 +49,7 @@ describe("alertable (quiet by default)", () => {
     expect(alertable("hearing_scheduled")).toBe(true);
     expect(alertable("decision")).toBe(true);
     expect(alertable("step_added")).toBe(false);
+    expect(alertable("introduced")).toBe(true); // the earliest moment to act: a new file sent to a committee
   });
 });
 

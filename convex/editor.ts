@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
 import { label } from "../lib/timeline/build";
-import { actionText, stepDate } from "../lib/ui/file";
+import { actionText, stepDate, isFileNumber } from "../lib/ui/file";
 import { PART_LABELS } from "../lib/ui/meeting";
 import { parseZoningChange } from "../lib/zoning/change";
 import { evaluativeWord } from "../lib/editor/rules";
@@ -143,7 +143,7 @@ export const saveCard = internalMutation({
 export const card = query({
   args: { kind: kindV, key: v.string() },
   handler: async (ctx, { kind, key }) => {
-    if (!/^\d{5,7}$|^\d+:\d+$/.test(key)) return null;
+    if (!isFileNumber(key) && !/^\d+:\d+$/.test(key)) return null;
     const c = await ctx.db.query("cards").withIndex("by_kind_key", (q) => q.eq("kind", kind).eq("key", key)).unique();
     if (!c?.sentences.length) return null;
     return { writtenAt: c.writtenAt, sentences: c.sentences.map((s) => ({ text: s.text, sources: s.sourceKeys.map((k) => c.sourceLabels[k] ?? k) })) };
